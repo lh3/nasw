@@ -5,6 +5,11 @@
 #define NS_NEG_INF (-0x40000000)
 #define ns_max(x, y) ((x) >= (y)? (x) : (y))
 
+void ns_rst_init(ns_rst_t *r)
+{
+	memset(r, 0, sizeof(*r));
+}
+
 static inline uint32_t *ns_push_cigar(void *km, int32_t *n_cigar, int32_t *m_cigar, uint32_t *cigar, uint32_t op, int32_t len)
 {
 	if (*n_cigar == 0 || op != (cigar[(*n_cigar) - 1]&0xf)) {
@@ -17,7 +22,7 @@ static inline uint32_t *ns_push_cigar(void *km, int32_t *n_cigar, int32_t *m_cig
 	return cigar;
 }
 
-static void ns_dps_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aal, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
+static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aal, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
 {
 	int32_t i = nal - 1, j = aal - 1, last = 0;
 	uint32_t *cigar = *cigar_;
@@ -71,6 +76,8 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 	uint8_t *nas, *aas, *bk = 0;
 	int8_t *nap, *acceptor, *donor;
 
+	r->n_cigar = 0;
+
 	{ // generate nas[] and aas[]
 		int32_t l;
 		uint8_t codon;
@@ -79,7 +86,7 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 		aas = nas + nal;
 		for (j = 0; j < aal; ++j)
 			aas[j] = opt->aa20[(uint8_t)as[j]];
-		memset(nas, 21, nal);
+		memset(nas, opt->aa20['X'], nal);
 		for (i = l = 0, codon = 0; i < nl; ++i) {
 			uint8_t c = opt->nt4[(uint8_t)ns[i]];
 			if (c < 4) {
@@ -184,11 +191,14 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 			}
 			swap = G, G = H, H = swap;
 		}
+		r->score = G[aal - 1];
 	}
 
 	// free
-	kfree(km, bk);
 	kfree(km, H);   // along with G[], D[] and I[]
 	kfree(km, nap); // along with donor[] and acceptor[]
 	kfree(km, nas); // along with aas[]
+
+	ns_s1_backtrack(km, bk, nal, aal, &r->cigar, &r->n_cigar, &r->m_cigar);
+	kfree(km, bk);
 }
