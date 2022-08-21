@@ -34,10 +34,10 @@ static void ns_dps_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t a
 		} else if (state == 3) {
 			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_N, 1), --i;
 		} else if (state == 4) {
-			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_N, 1), --i;
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_U, 1), --i;
 			if (!ext) --j;
 		} else if (state == 5) {
-			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_N, 1), --i;
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_V, 1), --i;
 			if (!ext) --j;
 		} else if (state == 6) {
 			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 1), --i;
@@ -65,7 +65,7 @@ static void ns_dps_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t a
  * B(i+1,j) = max{ H(i,j-1) - r - d(i+1), B(i,j) }
  * C(i+1,j) = max{ H(i,j-1) - r - d(i+2), C(i,j) }
  */
-void ns_dps_align_splice(void *km, const char *ns, int32_t nl, const char *as, int32_t al, int32_t asize, const int8_t *mat, int32_t q, int32_t e, int32_t r, int32_t f, int32_t cp)
+void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
 	int32_t nal, aal, i, j, *G, *H, *I, *D;
 	uint8_t *nas, *aas, *bk = 0;
@@ -78,40 +78,40 @@ void ns_dps_align_splice(void *km, const char *ns, int32_t nl, const char *as, i
 		nas = Kmalloc(km, uint8_t, nal + aal);
 		aas = nas + nal;
 		for (j = 0; j < aal; ++j)
-			aas[j] = ns_tab_aa20[(uint8_t)as[j]];
+			aas[j] = opt->aa20[(uint8_t)as[j]];
 		memset(nas, 21, nal);
 		for (i = l = 0, codon = 0; i < nl; ++i) {
-			uint8_t c = ns_tab_nt4[(uint8_t)ns[i]];
+			uint8_t c = opt->nt4[(uint8_t)ns[i]];
 			if (c < 4) {
 				codon = (codon << 2 | c) & 0x3f;
 				if (++l >= 3)
-					nas[i+1] = ns_tab_codon[codon];
+					nas[i+1] = opt->codon[codon];
 			} else codon = 0, l = 0;
 		}
 	}
 
 	{ // generate nap[], donor[] and acceptor[]
 		int32_t k, c;
-		nap = Kmalloc(km, int8_t, nal * (asize + 2));
-		donor = nap + nal * asize, acceptor = donor + nal;
-		for (c = 0, k = 0; c < asize; ++c) {
-			const int8_t *p = &mat[asize * c];
+		nap = Kmalloc(km, int8_t, nal * (opt->asize + 2));
+		donor = nap + nal * opt->asize, acceptor = donor + nal;
+		for (c = 0, k = 0; c < opt->asize; ++c) {
+			const int8_t *p = &opt->sc[opt->asize * c];
 			for (i = 0; i < nal; ++i)
 				nap[k++] = p[nas[i]];
 		}
 		for (i = 0; i < nal; ++i)
-			donor[i] = acceptor[i] = -cp;
+			donor[i] = acceptor[i] = -opt->nc;
 		for (i = 0; i < nl - 3; ++i) {
 			int32_t t = 0;
 			if (ns[i+1] == 2 && ns[i+2] == 3) t = 1;
 			if (t && i + 3 < nl && (ns[i+3] == 0 || ns[i+3] == 2)) t = 2;
-			donor[i+1] = t == 2? 0 : t == 1? -cp/2 : -cp;
+			donor[i+1] = t == 2? 0 : t == 1? -opt->nc/2 : -opt->nc;
 		}
 		for (i = 1; i < nl; ++i) {
 			int32_t t = 0;
 			if (ns[i-1] == 0 && ns[i] == 2) t = 1;
 			if (t && i > 0 && (ns[i-2] == 1 || ns[i-2] == 3)) t = 2;
-			acceptor[i+1] = t == 2? 0 : t == 1? -cp/2 : -cp;
+			acceptor[i+1] = t == 2? 0 : t == 1? -opt->nc/2 : -opt->nc;
 		}
 	}
 
@@ -129,9 +129,9 @@ void ns_dps_align_splice(void *km, const char *ns, int32_t nl, const char *as, i
 		G = H + nal, I = G + nal, D = I + nal;
 		for (i = 0; i < nal * 4; ++i) H[i] = NS_NEG_INF;
 		G[0] = G[1] = G[2] = 0;
-		D[0] = D[1] = D[2] = -q;
-		for (i = 3, A = -r; i < nal; ++i) {
-			D[i] = D[i-3] - e;
+		D[0] = D[1] = D[2] = -opt->go;
+		for (i = 3, A = -opt->io; i < nal; ++i) {
+			D[i] = D[i-3] - opt->ge;
 			G[i] = ns_max(D[i], A - acceptor[i]);
 		}
 	}
@@ -146,39 +146,39 @@ void ns_dps_align_splice(void *km, const char *ns, int32_t nl, const char *as, i
 				uint8_t z = 0, y = 0;
 				int32_t h = G[i-3] + ms[i], tmp;
 
-				z |= G[i] - q >= I[i]? 0 : 1<<3;
-				I[i] = ns_max(G[i] - q, I[i]) - e;
+				z |= G[i] - opt->go >= I[i]? 0 : 1<<3;
+				I[i] = ns_max(G[i] - opt->go, I[i]) - opt->ge;
 				y = h >= I[i]? y : 1;
 				h = ns_max(h, I[i]);
 
-				z |= H[i-3] - q >= D[i-3]? 0 : 1<<4;
-				D[i] = ns_max(H[i-3] - q, D[i-3]) - e;
+				z |= H[i-3] - opt->go >= D[i-3]? 0 : 1<<4;
+				D[i] = ns_max(H[i-3] - opt->go, D[i-3]) - opt->ge;
 				y = h >= D[i]? y : 2;
 				h = ns_max(h, D[i]);
 
-				tmp = H[i-1] - r - donor[i-1];
+				tmp = H[i-1] - opt->io - donor[i-1];
 				z |= tmp >= A? 0 : 1<<5;
 				A = ns_max(tmp, A);
 				y = h >= A - acceptor[i]? y : 3;
 				h = ns_max(h, A - acceptor[i]);
 
-				tmp = G[i-2] - r - donor[i];
+				tmp = G[i-2] - opt->io - donor[i];
 				z |= tmp >= B? 0 : 1<<6;
 				B = ns_max(tmp, B);
 				y = h >= B - acceptor[i-2]? y : 4;
 				h = ns_max(h, B - acceptor[i-2]);
 
-				tmp = G[i-1] - r - donor[i+1];
+				tmp = G[i-1] - opt->io - donor[i+1];
 				z |= tmp >= C? 0 : 1<<7;
 				C = ns_max(tmp, C);
 				y = h >= C - acceptor[i-1]? y : 5;
 				h = ns_max(h, C - acceptor[i-1]);
 
-				y = h >= H[i-2] - f? y : 6;
-				h = ns_max(h, H[i-2] - f);
+				y = h >= H[i-2] - opt->fs? y : 6;
+				h = ns_max(h, H[i-2] - opt->fs);
 
-				y = h >= H[i-1] - f? y : 7;
-				h = ns_max(h, H[i-1] - f);
+				y = h >= H[i-1] - opt->fs? y : 7;
+				h = ns_max(h, H[i-1] - opt->fs);
 
 				H[i] = h, bkj[i] = z | y;
 			}

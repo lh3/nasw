@@ -61,3 +61,17 @@ void ns_make_tables(int codon_type)
 		ns_tab_codon13[i] = ns_tab_a2r[ns_tab_codon[i]];
 	}
 }
+
+void ns_opt_init(ns_opt_t *opt)
+{
+	memset(opt, 0, sizeof(*opt));
+	opt->go = 11, opt->ge = 1;
+	opt->io = 31;
+	opt->nc = 9;
+	opt->fs = 15;
+	opt->asize = 21;
+	opt->sc = ns_mat_blosum62;
+	opt->nt4 = ns_tab_nt4;
+	opt->aa20 = ns_tab_aa20;
+	opt->codon = ns_tab_codon;
+}
