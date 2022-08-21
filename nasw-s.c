@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "nasw.h"
 #include "kalloc.h"
 
@@ -72,7 +73,7 @@ static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aa
  */
 void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
-	int32_t nal, aal, i, j, *G, *H, *I, *D;
+	int32_t nal, aal, i, j, *mem_H, *G, *H, *I, *D;
 	uint8_t *nas, *aas, *bk = 0;
 	int8_t *nap, *acceptor, *donor;
 
@@ -132,7 +133,7 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 	 */
 	{ // initialization
 		int32_t A;
-		H = Kmalloc(km, int32_t, nal * 4);
+		mem_H = H = Kmalloc(km, int32_t, nal * 4);
 		G = H + nal, I = G + nal, D = I + nal;
 		for (i = 0; i < nal * 4; ++i) H[i] = NS_NEG_INF;
 		G[0] = G[1] = G[2] = 0;
@@ -195,9 +196,9 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 	}
 
 	// free
-	kfree(km, H);   // along with G[], D[] and I[]
-	kfree(km, nap); // along with donor[] and acceptor[]
-	kfree(km, nas); // along with aas[]
+	kfree(km, mem_H); // H[], G[], D[] and I[]
+	kfree(km, nap);   // along with donor[] and acceptor[]
+	kfree(km, nas);   // along with aas[]
 
 	ns_s1_backtrack(km, bk, nal, aal, &r->cigar, &r->n_cigar, &r->m_cigar);
 	kfree(km, bk);
