@@ -88,16 +88,34 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 
 	r->n_cigar = 0;
 
-	{ // generate nas[] and aas[]
-		int32_t l;
+	{ // generate nas[], aas[], donor[], acceptor[] and nap[]
+		int32_t l, k, c;
 		uint8_t codon;
 		nal = nl + 1, aal = al;
-		nas = Kmalloc(km, uint8_t, nal + aal);
+		nas = Kmalloc(km, uint8_t, nal + aal + (nal + 1) * 2 + nal * opt->asize);
 		aas = nas + nal;
-		for (j = 0; j < aal; ++j)
+		donor = (int8_t*)aas + aal, acceptor = donor + nal + 1;
+		nap = acceptor + nal + 1;
+		for (j = 0; j < aal; ++j) // generate aas[]
 			aas[j] = opt->aa20[(uint8_t)as[j]];
+		for (i = 0; i < nl; ++i) // nt4 encoding of ns[] for computing donor[] and acceptor[]
+			nas[i] = opt->nt4[(uint8_t)ns[i]];
+		for (i = 0; i < nal + 1; ++i)
+			donor[i] = acceptor[i] = opt->nc;
+		for (i = 0; i < nl - 3; ++i) { // generate donor[]
+			int32_t t = 0;
+			if (nas[i+1] == 2 && nas[i+2] == 3) t = 1;
+			if (t && i + 3 < nl && (nas[i+3] == 0 || nas[i+3] == 2)) t = 2;
+			donor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
+		}
+		for (i = 1; i < nl; ++i) { // generate acceptor[]
+			int32_t t = 0;
+			if (nas[i-1] == 0 && nas[i] == 2) t = 1;
+			if (t && i > 0 && (nas[i-2] == 1 || nas[i-2] == 3)) t = 2;
+			acceptor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
+		}
 		memset(nas, opt->aa20['X'], nal);
-		for (i = l = 0, codon = 0; i < nl; ++i) {
+		for (i = l = 0, codon = 0; i < nl; ++i) { // generate the real nas[]
 			uint8_t c = opt->nt4[(uint8_t)ns[i]];
 			if (c < 4) {
 				codon = (codon << 2 | c) & 0x3f;
@@ -105,32 +123,14 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 					nas[i+1] = opt->codon[codon];
 			} else codon = 0, l = 0;
 		}
-		for (i = 0; i < nal; ++i) putchar(ns_tab_aa_i2c[nas[i]]); putchar('\n');
-	}
-
-	{ // generate nap[], donor[] and acceptor[]
-		int32_t k, c;
-		nap = Kmalloc(km, int8_t, nal * (opt->asize + 2));
+		nap = Kmalloc(km, int8_t, nal * opt->asize);
 		donor = nap + nal * opt->asize, acceptor = donor + nal;
-		for (c = 0, k = 0; c < opt->asize; ++c) {
+		for (c = 0, k = 0; c < opt->asize; ++c) { // generate nap[]
 			const int8_t *p = &opt->sc[opt->asize * c];
 			for (i = 0; i < nal; ++i)
 				nap[k++] = p[nas[i]];
 		}
-		for (i = 0; i < nal; ++i)
-			donor[i] = acceptor[i] = opt->nc;
-		for (i = 0; i < nl - 3; ++i) {
-			int32_t t = 0;
-			if (ns[i+1] == 2 && ns[i+2] == 3) t = 1;
-			if (t && i + 3 < nl && (ns[i+3] == 0 || ns[i+3] == 2)) t = 2;
-			donor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
-		}
-		for (i = 1; i < nl; ++i) {
-			int32_t t = 0;
-			if (ns[i-1] == 0 && ns[i] == 2) t = 1;
-			if (t && i > 0 && (ns[i-2] == 1 || ns[i-2] == 3)) t = 2;
-			acceptor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
-		}
+		//for (i = 0; i < nal; ++i) putchar(ns_tab_aa_i2c[nas[i]]); putchar('\n');
 	}
 
 	/*
@@ -139,7 +139,7 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 	 * A(i,j) = max{ H(i-1,j)   - r - d(i-1), A(i-1,j) }
 	 * B(i,j) = max{ H(i-1,j-1) - r - d(i),   B(i-1,j) }
 	 * C(i,j) = max{ H(i-1,j-1) - r - d(i+1), C(i-1,j) }
-	 * H(i,j) = max{ H(i-3,j-1) + s(i,j), I(i,j), D(i,j), H(i-2,j)-f, H(i-1,j)-f, A(i,j)-a(i), B(i,j)-a(i-2), C(i,j)-a(i-1) }
+	 * H(i,j) = max{ H(i-3,j-1) + s(i,j), I(i,j), D(i,j), H(i-1,j)-f, H(i-2,j)-f, A(i,j)-a(i), B(i,j)-a(i-2), C(i,j)-a(i-1) }
 	 */
 	{ // initialization. FIXME: I[] is not initialized correctly
 		int32_t A;
@@ -163,6 +163,7 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 			for (i = 3; i < nal; ++i) {
 				uint8_t z = 0, y = 0;
 				int32_t h = G[i-3] + ms[i], tmp;
+				//printf("%d\t%d\n", i, donor[i]);
 
 				z |= G[i] - opt->go >= I[i]? 0 : 1<<3;
 				I[i] = ns_max(G[i] - opt->go, I[i]) - opt->ge;
@@ -207,7 +208,6 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 
 	// free
 	kfree(km, mem_H); // H[], G[], D[] and I[]
-	kfree(km, nap);   // along with donor[] and acceptor[]
 	kfree(km, nas);   // along with aas[]
 
 	ns_s1_backtrack(km, bk, nal, aal, &r->cigar, &r->n_cigar, &r->m_cigar);
