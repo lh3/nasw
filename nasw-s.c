@@ -26,8 +26,8 @@ static inline uint32_t *ns_push_cigar(void *km, int32_t *n_cigar, int32_t *m_cig
 static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aal, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
 {
 	int32_t i = nal - 1, j = aal - 1, last = 0;
-	uint32_t *cigar = *cigar_;
-	while (i >= 0 && j >= 0) {
+	uint32_t *cigar = *cigar_, tmp;
+	while (i >= 1 && j >= 0) {
 		int32_t x = bk[j * nal + i], state, ext;
 		state = last == 0? x&7 : last;
 		ext = state >= 1 && state <= 5? x>>(state+2)&1 : 0;
@@ -48,10 +48,19 @@ static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aa
 		} else if (state == 6) {
 			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 1), --i;
 		} else if (state == 7) {
-			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_G, 1), i -= 2;
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_G, 2), i -= 2;
 		}
 		last = state >= 1 && state <= 5 && ext? state : 0;
 	}
+	if (j > 0) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_I, j); // TODO: is this correct?
+	if (i >= 1) {
+		int32_t l = (i-1)/3*3, t = i - l;
+		if (l > 0) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_D, l); // TODO: is this correct?
+		if (t == 2) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_G, 2);
+		else if (t == 1) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 1);
+	}
+	for (i = 0; i < (*n_cigar)>>1; ++i) // reverse CIGAR
+		tmp = cigar[i], cigar[i] = cigar[(*n_cigar) - 1 - i], cigar[(*n_cigar) - 1 - i] = tmp;
 	*cigar_ = cigar;
 }
 
@@ -96,6 +105,7 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 					nas[i+1] = opt->codon[codon];
 			} else codon = 0, l = 0;
 		}
+		for (i = 0; i < nal; ++i) putchar(ns_tab_aa_i2c[nas[i]]); putchar('\n');
 	}
 
 	{ // generate nap[], donor[] and acceptor[]
@@ -108,18 +118,18 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 				nap[k++] = p[nas[i]];
 		}
 		for (i = 0; i < nal; ++i)
-			donor[i] = acceptor[i] = -opt->nc;
+			donor[i] = acceptor[i] = opt->nc;
 		for (i = 0; i < nl - 3; ++i) {
 			int32_t t = 0;
 			if (ns[i+1] == 2 && ns[i+2] == 3) t = 1;
 			if (t && i + 3 < nl && (ns[i+3] == 0 || ns[i+3] == 2)) t = 2;
-			donor[i+1] = t == 2? 0 : t == 1? -opt->nc/2 : -opt->nc;
+			donor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
 		}
 		for (i = 1; i < nl; ++i) {
 			int32_t t = 0;
 			if (ns[i-1] == 0 && ns[i] == 2) t = 1;
 			if (t && i > 0 && (ns[i-2] == 1 || ns[i-2] == 3)) t = 2;
-			acceptor[i+1] = t == 2? 0 : t == 1? -opt->nc/2 : -opt->nc;
+			acceptor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
 		}
 	}
 
@@ -131,13 +141,13 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 	 * C(i,j) = max{ H(i-1,j-1) - r - d(i+1), C(i-1,j) }
 	 * H(i,j) = max{ H(i-3,j-1) + s(i,j), I(i,j), D(i,j), H(i-2,j)-f, H(i-1,j)-f, A(i,j)-a(i), B(i,j)-a(i-2), C(i,j)-a(i-1) }
 	 */
-	{ // initialization
+	{ // initialization. FIXME: I[] is not initialized correctly
 		int32_t A;
 		mem_H = H = Kmalloc(km, int32_t, nal * 4);
 		G = H + nal, I = G + nal, D = I + nal;
 		for (i = 0; i < nal * 4; ++i) H[i] = NS_NEG_INF;
-		G[0] = G[1] = G[2] = 0;
-		D[0] = D[1] = D[2] = -opt->go;
+		G[0] = 0, G[1] = G[2] = -opt->fs;
+		D[0] = -opt->go, D[1] = D[2] = -opt->fs - opt->go;
 		for (i = 3, A = -opt->io; i < nal; ++i) {
 			D[i] = D[i-3] - opt->ge;
 			G[i] = ns_max(D[i], A - acceptor[i]);
@@ -182,17 +192,17 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 				y = h >= C - acceptor[i-1]? y : 5;
 				h = ns_max(h, C - acceptor[i-1]);
 
-				y = h >= H[i-2] - opt->fs? y : 6;
-				h = ns_max(h, H[i-2] - opt->fs);
-
-				y = h >= H[i-1] - opt->fs? y : 7;
+				y = h >= H[i-1] - opt->fs? y : 6;
 				h = ns_max(h, H[i-1] - opt->fs);
+
+				y = h >= H[i-2] - opt->fs? y : 7;
+				h = ns_max(h, H[i-2] - opt->fs);
 
 				H[i] = h, bkj[i] = z | y;
 			}
 			swap = G, G = H, H = swap;
 		}
-		r->score = G[aal - 1];
+		r->score = G[nal - 1];
 	}
 
 	// free

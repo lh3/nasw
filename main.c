@@ -33,9 +33,13 @@ int main(int argc, char *argv[])
 
 	while (kseq_read(ksn) >= 0 && kseq_read(ksa) >= 0) {
 		ns_rst_t r;
+		int32_t i;
 		ns_rst_init(&r);
 		ns_splice_s1(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
-		printf("%s\t%ld\t%s\t%ld\t%d\n", ksn->name.s, ksn->seq.l, ksa->name.s, ksa->seq.l, r.score);
+		printf("%s\t%ld\t%s\t%ld\t%d\t", ksn->name.s, ksn->seq.l, ksa->name.s, ksa->seq.l, r.score);
+		for (i = 0; i < r.n_cigar; ++i)
+			printf("%d%c", r.cigar[i]>>4, NS_CIGAR_STR[r.cigar[i]&0xf]);
+		putchar('\n');
 	}
 
 	kseq_destroy(ksn);
