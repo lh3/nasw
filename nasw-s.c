@@ -48,7 +48,7 @@ static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aa
 		} else if (state == 6) {
 			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 1), --i;
 		} else if (state == 7) {
-			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_G, 2), i -= 2;
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 2), i -= 2;
 		}
 		last = state >= 1 && state <= 5 && ext? state : 0;
 	}
@@ -56,8 +56,7 @@ static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aa
 	if (i >= 1) {
 		int32_t l = (i-1)/3*3, t = i - l;
 		if (l > 0) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_D, l); // TODO: is this correct?
-		if (t == 2) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_G, 2);
-		else if (t == 1) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 1);
+		if (t != 0) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, t);
 	}
 	for (i = 0; i < (*n_cigar)>>1; ++i) // reverse CIGAR
 		tmp = cigar[i], cigar[i] = cigar[(*n_cigar) - 1 - i], cigar[(*n_cigar) - 1 - i] = tmp;
