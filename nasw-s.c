@@ -63,22 +63,6 @@ static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aa
 	*cigar_ = cigar;
 }
 
-/*
- * M(i,j) = max{ M(i-3,j-1), I(i-3,j-1), D(i-3,j-1), A(i-1,j-1)-a(i-1), B(i-3,j-1)-a(i-3), C(i-2,j-1)-a(i-2) } + s(i,j)
- *
- * H(-1,-1) = H(0,-1) = H(1,-1) = 0; for i<-1, H(i,-1) = -inf
- * I(-1,0) = I(0,0) = I(1,0) = -q - e
- * D(-1,-1) = D(0,-1) = D(1,-1) = -q
- * A(0,-1) = -r - d
- * B(1,-1) = C(2,-1) = -inf
- *
- * H(i,j)   = max{ H(i-3,j-1) + s(i,j), I(i,j), D(i,j), H(i-2,j)-f, H(i-1,j)-f, A(i,j)-a(i), B(i,j)-a(i-2), C(i,j)-a(i-1) }
- * I(i,j+1) = max{ H(i,j) - q, I(i,j) } - e
- * D(i+3,j) = max{ H(i,j) - q, D(i,j) } - e
- * A(i+1,j) = max{ H(i,j)   - r - d(i),   A(i,j) }
- * B(i+1,j) = max{ H(i,j-1) - r - d(i+1), B(i,j) }
- * C(i+1,j) = max{ H(i,j-1) - r - d(i+2), C(i,j) }
- */
 void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
 	int32_t nal, aal, i, j, *mem_H, *G, *H, *I, *D;
@@ -132,6 +116,8 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 	}
 
 	/*
+	 * M(i,j) = max{ M(i-3,j-1), I(i-3,j-1), D(i-3,j-1), A(i-1,j-1)-a(i-1), B(i-3,j-1)-a(i-3), C(i-2,j-1)-a(i-2) } + s(i,j)
+	 *
 	 * I(i,j) = max{ H(i,j-1) - q, I(i,j-1) } - e
 	 * D(i,j) = max{ H(i-3,j) - q, D(i-3,j) } - e
 	 * A(i,j) = max{ H(i-1,j)   - r - d(i-1), A(i-1,j) }
