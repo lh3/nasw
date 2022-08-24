@@ -119,48 +119,48 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 				v = _mm_load_si128(S + j);
 				h = _mm_adds_epi16(u, v);
 
-				t = _mm_sub_epi16(last_h, go);
+				t = _mm_subs_epi16(last_h, go);
 				t = _mm_max_epi16(t, I);
-				I = _mm_sub_epi16(t, ge);
+				I = _mm_subs_epi16(t, ge);
 				h = _mm_max_epi16(h, I);
 
 				u = _mm_load_si128(H3 + j);
 				v = _mm_load_si128(D3 + j);
-				t = _mm_max_epi16(_mm_sub_epi16(u, go), v);
-				t = _mm_sub_epi16(t, ge);
+				t = _mm_max_epi16(_mm_subs_epi16(u, go), v);
+				t = _mm_subs_epi16(t, ge);
 				_mm_store_si128(D + j, t);
 				h = _mm_max_epi16(h, t);
 
-				u = _mm_sub_epi16(_mm_load_si128(H1 + j), io);
+				u = _mm_subs_epi16(_mm_load_si128(H1 + j), io);
 				v = _mm_load_si128(A + j);
-				t = _mm_sub_epi16(u, dim1);
+				t = _mm_subs_epi16(u, dim1);
 				t = _mm_max_epi16(t, v);
 				_mm_store_si128(A + j, t);
-				h = _mm_max_epi16(h, _mm_sub_epi16(t, ai));
+				h = _mm_max_epi16(h, _mm_subs_epi16(t, ai));
 
-				u = _mm_sub_epi16(_mm_load_si128(H1 + j - 1), io);
+				u = _mm_subs_epi16(_mm_load_si128(H1 + j - 1), io);
 				v = _mm_load_si128(B + j);
-				t = _mm_sub_epi16(u, di);
+				t = _mm_subs_epi16(u, di);
 				t = _mm_max_epi16(t, v);
 				_mm_store_si128(B + j, t);
-				h = _mm_max_epi16(h, _mm_sub_epi16(t, aim2));
+				h = _mm_max_epi16(h, _mm_subs_epi16(t, aim2));
 
 				v = _mm_load_si128(C + j);
-				t = _mm_sub_epi16(u, dip1);
+				t = _mm_subs_epi16(u, dip1);
 				t = _mm_max_epi16(t, v);
 				_mm_store_si128(C + j, t);
-				h = _mm_max_epi16(h, _mm_sub_epi16(t, aim1));
+				h = _mm_max_epi16(h, _mm_subs_epi16(t, aim1));
 
-				t = _mm_sub_epi16(_mm_load_si128(H1 + j), fs);
+				t = _mm_subs_epi16(_mm_load_si128(H1 + j), fs);
 				h = _mm_max_epi16(h, t);
 
-				t = _mm_sub_epi16(_mm_load_si128(H2 + j), fs);
+				t = _mm_subs_epi16(_mm_load_si128(H2 + j), fs);
 				h = _mm_max_epi16(h, t);
 
-				t = _mm_sub_epi16(_mm_load_si128(H1 + j - 1), fs);
+				t = _mm_subs_epi16(_mm_load_si128(H1 + j - 1), fs);
 				h = _mm_max_epi16(h, t);
 
-				t = _mm_sub_epi16(_mm_load_si128(H2 + j - 1), fs);
+				t = _mm_subs_epi16(_mm_load_si128(H2 + j - 1), fs);
 				h = _mm_max_epi16(h, t);
 
 				_mm_store_si128(H + j, h);
@@ -173,8 +173,8 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 					h = _mm_load_si128(H + j);
 					h = _mm_max_epi16(h, I);
 					_mm_store_si128(H + j, h);
-					h = _mm_sub_epi16(h, goe);
-					I = _mm_sub_epi16(I, ge);
+					h = _mm_subs_epi16(h, goe);
+					I = _mm_subs_epi16(I, ge);
 					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) goto end_loop8;
 				}
 			}
