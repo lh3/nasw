@@ -36,7 +36,7 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 			donor[i] = acceptor[i] = opt->nc;
 		for (i = 0; i < nl - 3; ++i) { // generate donor[]
 			int32_t t = 0;
-			if (nas[i] == 2 && nas[i+2] == 3) t = 1;
+			if (nas[i+1] == 2 && nas[i+2] == 3) t = 1;
 			if (t && i + 3 < nl && (nas[i+3] == 0 || nas[i+3] == 2)) t = 2;
 			donor[i] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
 		}
@@ -106,7 +106,7 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 			ai = _mm_set1_epi16(acceptor[i]), aim1 = _mm_set1_epi16(acceptor[i-1]), aim2 = _mm_set1_epi16(acceptor[i-2]);
 			last_h = _mm_set1_epi16(NS_SSE_NEG_INF);
 			I = _mm_set1_epi16(NS_SSE_NEG_INF);
-			if (i > 2) {
+			if (i > 2) { // FIXME: this is close but not correct
 				H3[-1] = _mm_slli_si128(H3[slen - 1], 2), ns_sse_set(H3[-1], 0) = NS_SSE_NEG_INF;
 				H2[-1] = _mm_slli_si128(H2[slen - 1], 2), ns_sse_set(H2[-1], 0) = NS_SSE_NEG_INF;
 				H1[-1] = _mm_slli_si128(H1[slen - 1], 2), ns_sse_set(H1[-1], 0) = NS_SSE_NEG_INF;
