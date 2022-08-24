@@ -60,7 +60,7 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 	{ // generate protein profile
 		NS_SSE_INT *t;
 		int32_t a;
-		mem_ap = Kmalloc(km, uint8_t, (slen * opt->asize + 31) / 16 * 16);
+		mem_ap = Kmalloc(km, uint8_t, (16 * slen * opt->asize + 31) / 16 * 16);
 		ap = (__m128i*)(((size_t)mem_ap + 15) / 16 * 16); // 16-byte aligned
 		t = (NS_SSE_INT*)ap;
 		for (a = 0; a < opt->asize; ++a) {
@@ -82,10 +82,11 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 	 */
 	{
 		__m128i *H0, *H, *H1, *H2, *H3, *D, *D1, *D2, *D3, *A, *B, *C;
-		__m128i go, ge, io, fs;
+		__m128i go, ge, goe, io, fs;
 
 		go = _mm_set1_epi16(opt->go);
 		ge = _mm_set1_epi16(opt->ge);
+		goe= _mm_set1_epi16(opt->go + opt->ge);
 		io = _mm_set1_epi16(opt->io);
 		fs = _mm_set1_epi16(opt->fs);
 
@@ -101,6 +102,7 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 		ns_sse_set(H2[-1], 0) = ns_sse_set(H1[-1], 0) = -opt->fs;
 
 		for (i = 2; i < nl; ++i) {
+			int32_t k;
 			__m128i *tmp, I, *S = ap + nas[i] * slen, dim1, di, dip1, ai, aim1, aim2, last_h;
 			dim1 = _mm_set1_epi16(donor[i-1]), di = _mm_set1_epi16(donor[i]), dip1 = _mm_set1_epi16(donor[i+1]);
 			ai = _mm_set1_epi16(acceptor[i]), aim1 = _mm_set1_epi16(acceptor[i-1]), aim2 = _mm_set1_epi16(acceptor[i-2]);
@@ -164,7 +166,19 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 				_mm_store_si128(H + j, h);
 				last_h = h;
 			}
-			tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
+			for (k = 0; k < 8; ++k) { // the lazy-F loop
+				I = _mm_slli_si128(I, 2);
+				for (j = 0; j < slen; ++j) {
+					__m128i h;
+					h = _mm_load_si128(H + j);
+					h = _mm_max_epi16(h, I);
+					_mm_store_si128(H + j, h);
+					h = _mm_sub_epi16(h, goe);
+					I = _mm_sub_epi16(I, ge);
+					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) goto end_loop8;
+				}
+			}
+end_loop8:	tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
 			tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 		}
 		r->score = ns_sse_set(H1[slen - 1], (al-1)%8);
