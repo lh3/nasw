@@ -6,18 +6,16 @@
 #include <smmintrin.h>
 #endif
 
-#define NS_NEG_INF16 (-0x7000)
-
-typedef int16_t ns_int_t;
+#define NS_SSE_P       (8)
+#define NS_SSE_INT     int16_t
+#define NS_SSE_NEG_INF (-0x7000)
 
 void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
-	int32_t p = 8; // number of values per SSE vector
-	int32_t slen = (al + p - 1) / p;
-	int32_t i, j;
+	int32_t i, j, slen = (al + NS_SSE_P - 1) / NS_SSE_P; // segment length
 	uint8_t *nas, *aas, *ap0;
 	int8_t *donor, *acceptor;
-	__m128i *ap;
+	__m128i *ap, *H0;
 
 	{ // generate nas[], aas[], donor[] and acceptor[]
 		int32_t l;
@@ -55,20 +53,77 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 	}
 
 	{ // generate protein profile
-		ns_int_t *t;
+		NS_SSE_INT *t;
 		int32_t a;
 		ap0 = Kmalloc(km, uint8_t, (slen * opt->asize + 31) / 16 * 16);
 		ap = (__m128i*)(((size_t)ap0 + 15) / 16 * 16); // make ap 16-byte aligned
-		t = (ns_int_t*)ap;
+		t = (NS_SSE_INT*)ap;
 		for (a = 0; a < opt->asize; ++a) {
-			int i, k, nlen = slen * p;
+			int i, k, nlen = slen * NS_SSE_P;
 			const int8_t *ma = opt->sc + a * opt->asize;
 			for (i = 0; i < slen; ++i)
 				for (k = i; k < nlen; k += slen) // p iterations
-					*t++ = (k >= al? 0 : ma[aas[k]]);
+					*t++ = (k >= al? NS_SSE_NEG_INF : ma[aas[k]]);
 		}
 	}
 
+	/*
+	 * I(i,j) = max{ H(i,j-1) - q, I(i,j-1) } - e
+	 * D(i,j) = max{ H(i-3,j) - q, D(i-3,j) } - e
+	 * A(i,j) = max{ H(i-1,j)   - r - d(i-1), A(i-1,j) }
+	 * B(i,j) = max{ H(i-1,j-1) - r - d(i),   B(i-1,j) }
+	 * C(i,j) = max{ H(i-1,j-1) - r - d(i+1), C(i-1,j) }
+	 * H(i,j) = max{ H(i-3,j-1) + s(i,j), I(i,j), D(i,j), H(i-1,j)-f, H(i-2,j)-f, A(i,j)-a(i), B(i,j)-a(i-2), C(i,j)-a(i-1) }
+	 */
+	{
+		__m128i *H, *G[3], *D[3], *A, *B, *C, go, ge, io, fs;
+
+		H0 = H = Kmalloc(km, __m128i, slen * 10);
+		G[0] = H + slen, G[1] = G[0] + slen, G[2] = G[1] + slen;
+		D[0] = G[2] + slen, D[1] = D[0] + slen, D[2] = D[1] + slen;
+		A = D[2] + slen, B = A + slen, C = B + slen;
+
+		go = _mm_set1_epi16(opt->go);
+		ge = _mm_set1_epi16(opt->ge);
+		io = _mm_set1_epi16(opt->io);
+		fs = _mm_set1_epi16(opt->fs);
+
+		for (i = 2; i < nl; ++i) {
+			__m128i *tmp, *D3 = D[0], *H3 = G[0], *H2 = G[1], *H1 = G[2];
+			__m128i *S = ap + nas[i] * slen;
+			for (j = 0; j < slen; ++j) {
+				__m128i h, t, u;
+				h = _mm_add_epi16(H3[j], S[j]);
+
+				t = _mm_sub_epi16(H3[j], go);
+				t = _mm_max_epi16(t, D3[j]);
+				t = _mm_sub_epi16(t, ge);
+				_mm_store_si128(D3 + j, t);
+				h = _mm_max_epi16(h, t);
+
+				u = _mm_sub_epi16(H1[j], io);
+				t = _mm_max_epi16(u, A[j]);
+				_mm_store_si128(A + j, t);
+				h = _mm_max_epi16(h, t);
+
+				t = _mm_max_epi16(u, B[j]);
+				_mm_store_si128(B + j, t);
+				h = _mm_max_epi16(h, t);
+
+				t = _mm_max_epi16(u, C[j]);
+				_mm_store_si128(C + j, t);
+				h = _mm_max_epi16(h, t);
+
+				t = _mm_sub_epi16(H1[j], fs);
+				h = _mm_max_epi16(h, t);
+
+				t = _mm_sub_epi16(H2[j], fs);
+				h = _mm_max_epi16(h, t);
+			}
+		}
+	}
+
+	kfree(km, H0);
 	kfree(km, ap0);
 	kfree(km, nas);
 }

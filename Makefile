@@ -1,6 +1,6 @@
 CC=			gcc
 CXX=		g++
-CFLAGS=		-g -Wall -O3
+CFLAGS=		-g -Wall -O3 -msse4.1
 CXXFLAGS=	$(CFLAGS)
 CPPFLAGS=
 INCLUDES=
