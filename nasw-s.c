@@ -106,7 +106,6 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 					nas[i+1] = opt->codon[codon];
 			} else codon = 0, l = 0;
 		}
-		nap = Kmalloc(km, int8_t, nal * opt->asize);
 		for (c = 0, k = 0; c < opt->asize; ++c) { // generate nap[]
 			const int8_t *p = &opt->sc[opt->asize * c];
 			for (i = 0; i < nal; ++i)
@@ -147,7 +146,6 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 			for (i = 3; i < nal; ++i) {
 				uint8_t z = 0, y = 0;
 				int32_t h = G[i-3] + ms[i], tmp;
-				//printf("%d\t%d\n", i, donor[i]);
 
 				z |= G[i] - opt->go >= I[i]? 0 : 1<<3;
 				I[i] = ns_max(G[i] - opt->go, I[i]) - opt->ge;
