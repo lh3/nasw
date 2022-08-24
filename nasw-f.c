@@ -11,7 +11,7 @@
 #define NS_SSE_INT     int16_t
 #define NS_SSE_NEG_INF (-0x6000)
 
-#define ns_sse_set(x, i) ((NS_SSE_INT*)(&(x)))[(i)]
+#define ns_sse_i(x, i) ((NS_SSE_INT*)(&(x)))[(i)]
 
 void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
@@ -64,7 +64,7 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 		ap = (__m128i*)(((size_t)mem_ap + 15) / 16 * 16); // 16-byte aligned
 		t = (NS_SSE_INT*)ap;
 		for (a = 0; a < opt->asize; ++a) {
-			int i, k, nlen = slen * NS_SSE_P;
+			int32_t i, k, nlen = slen * NS_SSE_P;
 			const int8_t *ma = opt->sc + a * opt->asize;
 			for (i = 0; i < slen; ++i)
 				for (k = i; k < nlen; k += slen) // p iterations
@@ -98,8 +98,8 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 
 		for (i = 0; i < (slen + 1) * 4 + slen * 7; ++i)
 			H0[i] = _mm_set1_epi16(NS_SSE_NEG_INF);
-		ns_sse_set(H3[-1], 0) = 0;
-		ns_sse_set(H2[-1], 0) = ns_sse_set(H1[-1], 0) = -opt->fs;
+		ns_sse_i(H3[-1], 0) = 0;
+		ns_sse_i(H2[-1], 0) = ns_sse_i(H1[-1], 0) = -opt->fs;
 
 		for (i = 2; i < nl; ++i) {
 			int32_t k;
@@ -109,9 +109,9 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 			last_h = _mm_set1_epi16(NS_SSE_NEG_INF);
 			I = _mm_set1_epi16(NS_SSE_NEG_INF);
 			if (i > 2) { // FIXME: this is close but not correct
-				H3[-1] = _mm_slli_si128(H3[slen - 1], 2), ns_sse_set(H3[-1], 0) = NS_SSE_NEG_INF;
-				H2[-1] = _mm_slli_si128(H2[slen - 1], 2), ns_sse_set(H2[-1], 0) = NS_SSE_NEG_INF;
-				H1[-1] = _mm_slli_si128(H1[slen - 1], 2), ns_sse_set(H1[-1], 0) = NS_SSE_NEG_INF;
+				H3[-1] = _mm_slli_si128(H3[slen - 1], 2), ns_sse_i(H3[-1], 0) = NS_SSE_NEG_INF;
+				H2[-1] = _mm_slli_si128(H2[slen - 1], 2), ns_sse_i(H2[-1], 0) = NS_SSE_NEG_INF;
+				H1[-1] = _mm_slli_si128(H1[slen - 1], 2), ns_sse_i(H1[-1], 0) = NS_SSE_NEG_INF;
 			}
 			for (j = 0; j < slen; ++j) {
 				__m128i h, t, u, v;
@@ -166,7 +166,7 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 				_mm_store_si128(H + j, h);
 				last_h = h;
 			}
-			for (k = 0; k < 8; ++k) { // the lazy-F loop
+			for (k = 0; k < NS_SSE_P; ++k) {
 				I = _mm_slli_si128(I, 2);
 				for (j = 0; j < slen; ++j) {
 					__m128i h;
@@ -178,10 +178,11 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) goto end_loop8;
 				}
 			}
-end_loop8:	tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
+end_loop8:
+			tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
 			tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 		}
-		r->score = ns_sse_set(H1[slen - 1], (al-1)%8);
+		r->score = slen > 1? ns_sse_i(H1[(al-1)%slen], NS_SSE_P-1) : ns_sse_i(H1[0], (al-1)%NS_SSE_P);
 		kfree(km, mem_H);
 	}
 
