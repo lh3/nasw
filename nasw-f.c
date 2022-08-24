@@ -8,14 +8,14 @@
 
 #define NS_SSE_P       (8)
 #define NS_SSE_INT     int16_t
-#define NS_SSE_NEG_INF (-0x7000)
+#define NS_SSE_NEG_INF (-0x6000)
 
 void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
 	int32_t i, j, slen = (al + NS_SSE_P - 1) / NS_SSE_P; // segment length
-	uint8_t *nas, *aas, *ap0;
+	uint8_t *nas, *aas, *mem_ap, *mem_H;
 	int8_t *donor, *acceptor;
-	__m128i *ap, *H0;
+	__m128i *ap;
 
 	{ // generate nas[], aas[], donor[] and acceptor[]
 		int32_t l;
@@ -55,8 +55,8 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 	{ // generate protein profile
 		NS_SSE_INT *t;
 		int32_t a;
-		ap0 = Kmalloc(km, uint8_t, (slen * opt->asize + 31) / 16 * 16);
-		ap = (__m128i*)(((size_t)ap0 + 15) / 16 * 16); // make ap 16-byte aligned
+		mem_ap = Kmalloc(km, uint8_t, (slen * opt->asize + 31) / 16 * 16);
+		ap = (__m128i*)(((size_t)mem_ap + 15) / 16 * 16); // 16-byte aligned
 		t = (NS_SSE_INT*)ap;
 		for (a = 0; a < opt->asize; ++a) {
 			int i, k, nlen = slen * NS_SSE_P;
@@ -76,54 +76,72 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 	 * H(i,j) = max{ H(i-3,j-1) + s(i,j), I(i,j), D(i,j), H(i-1,j)-f, H(i-2,j)-f, A(i,j)-a(i), B(i,j)-a(i-2), C(i,j)-a(i-1) }
 	 */
 	{
-		__m128i *H, *G[3], *D[3], *A, *B, *C, go, ge, io, fs;
-
-		H0 = H = Kmalloc(km, __m128i, slen * 10);
-		G[0] = H + slen, G[1] = G[0] + slen, G[2] = G[1] + slen;
-		D[0] = G[2] + slen, D[1] = D[0] + slen, D[2] = D[1] + slen;
-		A = D[2] + slen, B = A + slen, C = B + slen;
+		__m128i *H0, *H, *H1, *H2, *H3, *D, *D1, *D2, *D3, *A, *B, *C;
+		__m128i go, ge, io, fs;
 
 		go = _mm_set1_epi16(opt->go);
 		ge = _mm_set1_epi16(opt->ge);
 		io = _mm_set1_epi16(opt->io);
 		fs = _mm_set1_epi16(opt->fs);
 
+		mem_H = Kmalloc(km, uint8_t, (sizeof(__m128i) * ((slen + 1) * 4 + slen * 7) + 31) / 16 * 16);
+		H0 = (__m128i*)(((size_t)mem_H + 15) / 16 * 16); // 16-byte aligned
+		H = H0 + 1, H1 = H0 + (slen + 1) + 1, H2 = H0 + (slen + 1) * 2 + 1, H3 = H0 + (slen + 1) * 3 + 1;
+		D = H3 + slen, D1 = D + slen, D2 = D1 + slen, D3 = D2 + slen;
+		A = D3 + slen, B = A + slen, C = B + slen;
+
 		for (i = 2; i < nl; ++i) {
-			__m128i *tmp, *D3 = D[0], *H3 = G[0], *H2 = G[1], *H1 = G[2];
-			__m128i *S = ap + nas[i] * slen;
+			__m128i I, *S = ap + nas[i] * slen;
+			__m128i dim1 = _mm_set1_epi16(donor[i-1]), di = _mm_set1_epi16(donor[i]), dip1 = _mm_set1_epi16(donor[i+1]);
+			__m128i ai = _mm_set1_epi16(acceptor[i]), aim1 = _mm_set1_epi16(acceptor[i-1]), aim2 = _mm_set1_epi16(acceptor[i-2]);
+			__m128i last_h = _mm_set1_epi16(NS_SSE_NEG_INF);
 			for (j = 0; j < slen; ++j) {
 				__m128i h, t, u;
-				h = _mm_add_epi16(H3[j], S[j]);
+				h = _mm_adds_epi16(H3[j-1], S[j]);
+
+				t = _mm_sub_epi16(last_h, go);
+				t = _mm_max_epi16(t, I);
+				I = _mm_sub_epi16(t, ge);
+				h = _mm_max_epi16(h, I);
 
 				t = _mm_sub_epi16(H3[j], go);
 				t = _mm_max_epi16(t, D3[j]);
 				t = _mm_sub_epi16(t, ge);
-				_mm_store_si128(D3 + j, t);
+				_mm_store_si128(D + j, t);
 				h = _mm_max_epi16(h, t);
 
 				u = _mm_sub_epi16(H1[j], io);
-				t = _mm_max_epi16(u, A[j]);
+				t = _mm_sub_epi16(u, dim1);
+				t = _mm_max_epi16(t, A[j]);
 				_mm_store_si128(A + j, t);
-				h = _mm_max_epi16(h, t);
+				h = _mm_max_epi16(h, _mm_sub_epi16(t, ai));
 
-				t = _mm_max_epi16(u, B[j]);
+				u = _mm_sub_epi16(H1[j-1], io);
+				t = _mm_sub_epi16(u, di);
+				t = _mm_max_epi16(t, B[j]);
 				_mm_store_si128(B + j, t);
-				h = _mm_max_epi16(h, t);
+				h = _mm_max_epi16(h, _mm_sub_epi16(t, aim2));
 
-				t = _mm_max_epi16(u, C[j]);
+				t = _mm_sub_epi16(u, dip1);
+				t = _mm_max_epi16(t, C[j]);
 				_mm_store_si128(C + j, t);
-				h = _mm_max_epi16(h, t);
+				h = _mm_max_epi16(h, _mm_sub_epi16(t, aim1));
 
 				t = _mm_sub_epi16(H1[j], fs);
 				h = _mm_max_epi16(h, t);
 
 				t = _mm_sub_epi16(H2[j], fs);
 				h = _mm_max_epi16(h, t);
+
+				_mm_store_si128(H + i, h);
+				last_h = h;
 			}
+			H3 = H2, H2 = H1, H1 = H, H = H3;
+			D3 = D2, D2 = D1, D1 = D, D = D3;
 		}
 	}
 
-	kfree(km, H0);
-	kfree(km, ap0);
+	kfree(km, mem_H);
+	kfree(km, mem_ap);
 	kfree(km, nas);
 }
