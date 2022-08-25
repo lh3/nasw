@@ -169,7 +169,7 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 			last_h = h;
 		}
 		for (k = 0; k < NS_SSE_P; ++k) {
-			I = _mm_slli_si128(I, 2);
+			I = _mm_insert_epi16(_mm_slli_si128(I, 2), NS_SSE_NEG_INF, 0);
 			for (j = 0; j < slen; ++j) {
 				__m128i h;
 				h = _mm_load_si128(H + j);
@@ -185,7 +185,6 @@ void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t
 		tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 	}
 	r->score = *((NS_SSE_INT*)&H1[(al-1)%slen] + (al < NS_SSE_P? al : NS_SSE_P) - 1);
-	//for (i = 0; i < 8; ++i) printf("%d,%d\n", i, ((int16_t*)&H1[0])[i]);
 	kfree(km, mem_H);
 
 	kfree(km, mem_ap);
