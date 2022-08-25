@@ -1,10 +1,10 @@
 CC=			gcc
 CXX=		g++
-CFLAGS=		-g -Wall -O3 -msse4.1
+CFLAGS=		-g -Wall -msse4.1 -std=c99 -O3
 CXXFLAGS=	$(CFLAGS)
 CPPFLAGS=
 INCLUDES=
-OBJS=		kalloc.o nasw-tab.o nasw-s.o nasw-f.o
+OBJS=		kalloc.o nasw-tab.o nasw-s.o nasw-f.o nasw-gs.o
 PROG=		nasw
 LIBS=		-lpthread -lz
 
@@ -38,5 +38,6 @@ depend:
 kalloc.o: kalloc.h
 main.o: ketopt.h nasw.h kseq.h
 nasw-f.o: nasw.h kalloc.h
+nasw-gs.o: nasw.h kalloc.h
 nasw-s.o: nasw.h kalloc.h
 nasw-tab.o: nasw.h
