@@ -182,7 +182,7 @@ end_loop8:
 			tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
 			tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 		}
-		r->score = slen > 1? ns_sse_i(H1[(al-1)%slen], NS_SSE_P-1) : ns_sse_i(H1[0], (al-1)%NS_SSE_P);
+		r->score = al >= NS_SSE_P? ns_sse_i(H1[(al-1)%slen], NS_SSE_P-1) : ns_sse_i(H1[0], al-1);
 		kfree(km, mem_H);
 	}
 
