@@ -117,7 +117,7 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 			H1[-1] = sse_gen(insert, _suf)(_mm_slli_si128(H1[slen - 1], sizeof(ns_int_t)), neg_inf, 0); \
 		}
 
-void ns_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
+void ns_global_score_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
 	NS_GEN_DEF(int16_t)
 	NS_GEN_VAR(epi16)
