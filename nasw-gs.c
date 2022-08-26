@@ -16,6 +16,12 @@
  * H(i,j) = max{ H(i-3,j-1) + s(i,j), I(i,j), D(i,j), H(i-1,j-1)-f, H(i-2,j-1)-f, H(i-1,j)-f, H(i-2,j)-f, A(i,j)-a(i), B(i,j)-a(i-2), C(i,j)-a(i-1) }
  */
 
+static __m128i *ns_alloc16(void *km, size_t n, uint8_t **mem)
+{
+	*mem = Kmalloc(km, uint8_t, (16 * n + 31) / 16 * 16);
+	return (__m128i*)(((size_t)(*mem) + 15) / 16 * 16);
+}
+
 static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, uint8_t **aas_, int8_t **donor_, int8_t **acceptor_)
 {
 	int32_t i, j, l;
@@ -57,8 +63,7 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 #define ns_gen_prof(INT_TYPE, _km, aas, al, opt, neg_inf, _mem_ap, _ap) do { \
 	INT_TYPE *t; \
 	int32_t a, p = 16 / sizeof(INT_TYPE), slen = (al + p - 1) / p; \
-	*(_mem_ap) = Kmalloc(_km, uint8_t, (16 * slen * opt->asize + 31) / 16 * 16); \
-	*(_ap) = (__m128i*)(((size_t)*(_mem_ap) + 15) / 16 * 16); /* 16-byte aligned */ \
+	*(_ap) = ns_alloc16(_km, slen * opt->asize, _mem_ap); \
 	t = (INT_TYPE*)*(_ap); \
 	for (a = 0; a < opt->asize; ++a) { \
 		int32_t i, k, nlen = slen * p; \
@@ -92,8 +97,7 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 	goe= sse_gen(set1, _suf)(opt->go + opt->ge); \
 	io = sse_gen(set1, _suf)(opt->io); \
 	fs = sse_gen(set1, _suf)(opt->fs); \
-	mem_H = Kmalloc(km, uint8_t, (sizeof(__m128i) * ((slen + 1) * 4 + slen * 7) + 31) / 16 * 16); \
-	H0 = (__m128i*)(((size_t)mem_H + 15) / 16 * 16); /* 16-byte aligned */ \
+	H0 = ns_alloc16(km, (slen + 1) * 4 + slen * 7, &mem_H); \
 	H = H0 + 1, H1 = H0 + (slen + 1) + 1, H2 = H0 + (slen + 1) * 2 + 1, H3 = H0 + (slen + 1) * 3 + 1; \
 	D = H3 + slen, D1 = D + slen, D2 = D1 + slen, D3 = D2 + slen; \
 	A = D3 + slen, B = A + slen, C = B + slen;
@@ -205,16 +209,19 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 {
 	NS_GEN_DEF(int16_t)
 	__m128i *bt;
+	uint8_t *mem_bt;
 	NS_GEN_VAR(epi16)
 	NS_GEN_PREPARE(epi16)
 	NS_GEN_INIT1(epi16)
-	bt = Kmalloc(km, uint16_t, nl * slen * vsize);
+	bt = ns_alloc16(km, nl * slen, &mem_bt);
 
 	for (i = 2; i < nl; ++i) {
+		__m128i *bti = bt + i * slen;
 		NS_GEN_INIT2(epi16)
 		for (j = 0; j < slen; ++j) {
 			__m128i h, t, u, v, y, z;
-			y = z = _mm_set_zero_si128();
+			y = _mm_setzero_si128();
+			z = _mm_setzero_si128();
 			u = _mm_load_si128(H3 + j - 1);
 			v = _mm_load_si128(S + j);
 			h = _mm_adds_epi16(u, v);
@@ -223,7 +230,7 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 			z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi16(I, t), _mm_set1_epi16(1<<4)));
 			t = _mm_max_epi16(t, I);
 			I = _mm_subs_epi16(t, ge);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(1), _mm_cmpgt_epi16(I, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(1), _mm_cmpgt_epi16(I, h));
 			h = _mm_max_epi16(h, I);
 
 			u = _mm_subs_epi16(_mm_load_si128(H3 + j), go);
@@ -232,7 +239,7 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 			t = _mm_max_epi16(u, v);
 			t = _mm_subs_epi16(t, ge);
 			_mm_store_si128(D + j, t);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(2), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(2), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			u = _mm_subs_epi16(_mm_load_si128(H1 + j), io);
@@ -242,7 +249,7 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 			t = _mm_max_epi16(t, v);
 			_mm_store_si128(A + j, t);
 			t = _mm_subs_epi16(t, ai);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(3), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(3), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			u = _mm_subs_epi16(_mm_load_si128(H1 + j - 1), io);
@@ -252,7 +259,7 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 			t = _mm_max_epi16(t, v);
 			_mm_store_si128(B + j, t);
 			t = _mm_subs_epi16(t, aim2);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(4), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(4), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			v = _mm_load_si128(C + j);
@@ -261,23 +268,23 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 			t = _mm_max_epi16(t, v);
 			_mm_store_si128(C + j, t);
 			t = _mm_subs_epi16(t, aim1);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(5), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(5), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			t = _mm_subs_epi16(_mm_load_si128(H1 + j), fs);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(6), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(6), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			t = _mm_subs_epi16(_mm_load_si128(H2 + j), fs);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(7), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(7), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			t = _mm_subs_epi16(_mm_load_si128(H1 + j - 1), fs);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(8), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(8), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			t = _mm_subs_epi16(_mm_load_si128(H2 + j - 1), fs);
-			y = _mm_blend_epi16(y, _mm_set1_epi16(9), _mm_cmpgt_epi16(t, h));
+			y = _mm_blendv_epi8(y, _mm_set1_epi16(9), _mm_cmpgt_epi16(t, h));
 			h = _mm_max_epi16(h, t);
 
 			z = _mm_or_si128(z, y);
@@ -291,7 +298,7 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 				__m128i h, z;
 				z = _mm_load_si128(bti + j);
 				h = _mm_load_si128(H + j);
-				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi16(I, h), _mm_set1_epi16(1<<4)));
+				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi16(I, h), _mm_set1_epi16(1<<9)));
 				h = _mm_max_epi16(h, I);
 				_mm_store_si128(bti + j, z);
 				_mm_store_si128(H + j, h);
@@ -308,5 +315,5 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 	kfree(km, mem_H);
 	kfree(km, mem_ap);
 	kfree(km, nas);
-	kfree(km, bt);
+	kfree(km, mem_bt);
 }
