@@ -15,11 +15,14 @@
 
 #define NS_CIGAR_STR   "MIDNSHP=XBFGUV"
 
+#define NS_F_CIGAR    0x1
+
 extern char *ns_tab_nt_i2c, *ns_tab_aa_i2c;
 extern uint8_t ns_tab_a2r[22], ns_tab_nt4[256], ns_tab_aa20[256], ns_tab_aa13[256];
 extern uint8_t ns_tab_codon[64], ns_tab_codon13[64];
 
 typedef struct {
+	int32_t flag;
 	int32_t go, ge, io, nc, fs;
 	int32_t asize;
 	int8_t *sc;
@@ -43,8 +46,7 @@ void ns_rst_init(ns_rst_t *r);
 void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r);
 void ns_splice_i16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r);
 
-void ns_global_sc_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r);
-void ns_global_tb_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r);
+void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r);
 
 static inline uint32_t *ns_push_cigar(void *km, int32_t *n_cigar, int32_t *m_cigar, uint32_t *cigar, uint32_t op, int32_t len)
 {

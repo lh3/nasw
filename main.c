@@ -17,8 +17,9 @@ int main(int argc, char *argv[])
 
 	ns_make_tables(0);
 	ns_opt_init(&opt);
-	while ((c = ketopt(&o, argc, argv, 1, "f", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "fc", 0)) >= 0) {
 		if (c == 'f') use_sse = 1;
+		else if (c == 'c') opt.flag |= NS_F_CIGAR;
 	}
 	if (argc - o.ind < 2) {
 		fprintf(stderr, "Usage: nasw [options] <nt.fa> <aa.fa>\n");
@@ -36,7 +37,7 @@ int main(int argc, char *argv[])
 		ns_rst_t r;
 		int32_t i;
 		ns_rst_init(&r);
-		if (use_sse) ns_global_tb_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
+		if (use_sse) ns_global_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else ns_splice_s1(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		printf("%s\t%ld\t%s\t%ld\t%d\t", ksn->name.s, ksn->seq.l, ksa->name.s, ksa->seq.l, r.score);
 		for (i = 0; i < r.n_cigar; ++i)
