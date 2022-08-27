@@ -22,6 +22,53 @@ static __m128i *ns_alloc16(void *km, size_t n, uint8_t **mem)
 	return (__m128i*)(((size_t)(*mem) + 15) / 16 * 16);
 }
 
+static void ns_backtrack(void *km, const __m128i *bt, int32_t nl, int32_t al, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
+{
+	int32_t i = nl - 1, j = al - 1, last = 0, slen = (al + 7) / 8;
+	uint32_t *cigar = *cigar_, tmp;
+	while (i >= 1 && j >= 0) {
+		const __m128i *bti = &bt[i * slen];
+		int32_t x = *((int16_t*)&bti[j%slen] + j/slen);
+		int32_t state, ext;
+		if (x>>9&1) x = 1|x>>4<<4;
+		state = last == 0? x&0xf : last;
+		ext = state >= 1 && state <= 5? x>>(state+3)&1 : 0;
+		if (state == 0) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_M, 1), i -= 3, --j;
+		} else if (state == 1) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_I, 1), --j;
+		} else if (state == 2) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_D, 1), i -= 3;
+		} else if (state == 3) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_N, 1), --i;
+		} else if (state == 4) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_U, 1), --i;
+			if (!ext) --j;
+		} else if (state == 5) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_V, 1), --i;
+			if (!ext) --j;
+		} else if (state == 6) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 1), --i;
+		} else if (state == 7) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, 2), i -= 2;
+		} else if (state == 8) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_G, 1), --i, --j;
+		} else if (state == 9) {
+			cigar = ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_G, 2), i -= 2, --j;
+		}
+		last = state >= 1 && state <= 5 && ext? state : 0;
+	}
+	if (j > 0) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_I, j); // TODO: is this correct?
+	if (i >= 1) {
+		int32_t l = (i-1)/3*3, t = i - l;
+		if (l > 0) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_D, l); // TODO: is this correct?
+		if (t != 0) ns_push_cigar(km, n_cigar, m_cigar, cigar, NS_CIGAR_F, t);
+	}
+	for (i = 0; i < (*n_cigar)>>1; ++i) // reverse CIGAR
+		tmp = cigar[i], cigar[i] = cigar[(*n_cigar) - 1 - i], cigar[(*n_cigar) - 1 - i] = tmp;
+	*cigar_ = cigar;
+}
+
 static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, uint8_t **aas_, int8_t **donor_, int8_t **acceptor_)
 {
 	int32_t i, j, l;
@@ -199,7 +246,7 @@ void ns_global_score_gs16(void *km, const char *ns, int32_t nl, const char *as, 
 		tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
 		tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 	}
-	r->score = *((ns_int_t*)&H1[(al-1)%slen] + (al < vsize? al : vsize) - 1);
+	r->score = *((ns_int_t*)&H1[(al-1)%slen] + (al-1)/slen);
 	kfree(km, mem_H);
 	kfree(km, mem_ap);
 	kfree(km, nas);
@@ -311,9 +358,10 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 		tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
 		tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 	}
-	r->score = *((ns_int_t*)&H1[(al-1)%slen] + (al < vsize? al : vsize) - 1);
+	r->score = *((ns_int_t*)&H1[(al-1)%slen] + (al-1)/slen);
 	kfree(km, mem_H);
 	kfree(km, mem_ap);
 	kfree(km, nas);
+	ns_backtrack(km, bt, nl, al, &r->cigar, &r->n_cigar, &r->m_cigar);
 	kfree(km, mem_bt);
 }

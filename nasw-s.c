@@ -11,18 +11,6 @@ void ns_rst_init(ns_rst_t *r)
 	memset(r, 0, sizeof(*r));
 }
 
-static inline uint32_t *ns_push_cigar(void *km, int32_t *n_cigar, int32_t *m_cigar, uint32_t *cigar, uint32_t op, int32_t len)
-{
-	if (*n_cigar == 0 || op != (cigar[(*n_cigar) - 1]&0xf)) {
-		if (*n_cigar == *m_cigar) {
-			(*m_cigar) += ((*m_cigar)>>1) + 8;
-			cigar = Krealloc(km, uint32_t, cigar, *m_cigar);
-		}
-		cigar[(*n_cigar)++] = len<<4 | op;
-	} else cigar[(*n_cigar)-1] += len<<4;
-	return cigar;
-}
-
 static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aal, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
 {
 	int32_t i = nal - 1, j = aal - 1, last = 0;

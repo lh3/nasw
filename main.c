@@ -36,7 +36,8 @@ int main(int argc, char *argv[])
 		ns_rst_t r;
 		int32_t i;
 		ns_rst_init(&r);
-		if (use_sse) ns_global_score_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
+//		if (use_sse) ns_global_score_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
+		if (use_sse) ns_global_bt_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else ns_splice_s1(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		printf("%s\t%ld\t%s\t%ld\t%d\t", ksn->name.s, ksn->seq.l, ksa->name.s, ksa->seq.l, r.score);
 		for (i = 0; i < r.n_cigar; ++i)
