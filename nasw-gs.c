@@ -126,11 +126,6 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 
 #define sse_gen(func, suf) _mm_##func##_##suf
 
-#define NS_GEN_DEF(INT_TYPE) \
-	typedef INT_TYPE ns_int_t; \
-	const int32_t ssize = sizeof(ns_int_t), vsize = 16 / ssize; \
-	const INT_TYPE neg_inf = (INT_TYPE)(1 << (8*ssize - 1));
-
 #define NS_GEN_VAR(_suf) \
 	int32_t i, j, slen = (al + vsize - 1) / vsize; /* segment length */ \
 	uint8_t *nas, *aas, *mem_ap, *mem_H, *mem_tb = 0; \
@@ -174,7 +169,9 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 
 void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
-	NS_GEN_DEF(int16_t)
+	typedef int16_t ns_int_t;
+	const int32_t ssize = sizeof(ns_int_t), vsize = 16 / ssize;
+	const ns_int_t neg_inf = (ns_int_t)(1 << (8*ssize - 1));
 	NS_GEN_VAR(epi16)
 	NS_GEN_PREPARE(epi16)
 	NS_GEN_INIT1(epi16)
@@ -340,6 +337,193 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 					h = _mm_subs_epi16(h, goe);
 					I = _mm_subs_epi16(I, ge);
 					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) break;
+				}
+				if (k < vsize) break;
+			}
+			tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
+			tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
+		}
+	}
+	r->score = *((ns_int_t*)&H1[(al-1)%slen] + (al-1)/slen);
+	kfree(km, mem_H);
+	kfree(km, mem_ap);
+	kfree(km, nas);
+	if (tb) {
+		ns_backtrack(km, vsize, tb, nl, al, &r->cigar, &r->n_cigar, &r->m_cigar);
+		kfree(km, mem_tb);
+	}
+}
+
+void ns_global_gs32(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
+{
+	typedef int32_t ns_int_t;
+	const int32_t ssize = sizeof(ns_int_t), vsize = 16 / ssize;
+	const ns_int_t neg_inf = -0x40000000;
+	NS_GEN_VAR(epi32)
+	NS_GEN_PREPARE(epi32)
+	NS_GEN_INIT1(epi32)
+
+	if (tb == 0) {
+		for (i = 2; i < nl; ++i) {
+			NS_GEN_INIT2(epi32)
+			for (j = 0; j < slen; ++j) {
+				__m128i h, t, u, v;
+				// H(i-3,j-1) + s(i,j)
+				u = _mm_load_si128(H3 + j - 1);
+				v = _mm_load_si128(S + j);
+				h = _mm_add_epi32(u, v);
+				// I(i,j) = max{ H(i,j-1) - q, I(i,j-1) } - e
+				t = _mm_sub_epi32(last_h, go);
+				t = _mm_max_epi32(t, I);
+				I = _mm_sub_epi32(t, ge);
+				h = _mm_max_epi32(h, I);
+				// D(i,j) = max{ H(i-3,j) - q, D(i-3,j) } - e
+				u = _mm_load_si128(H3 + j);
+				v = _mm_load_si128(D3 + j);
+				t = _mm_max_epi32(_mm_sub_epi32(u, go), v);
+				t = _mm_sub_epi32(t, ge);
+				_mm_store_si128(D + j, t);
+				h = _mm_max_epi32(h, t);
+				// A(i,j) = max{ H(i-1,j)   - r - d(i-1), A(i-1,j) }
+				u = _mm_sub_epi32(_mm_load_si128(H1 + j), io);
+				v = _mm_load_si128(A + j);
+				t = _mm_sub_epi32(u, dim1);
+				t = _mm_max_epi32(t, v);
+				_mm_store_si128(A + j, t);
+				h = _mm_max_epi32(h, _mm_sub_epi32(t, ai));
+				// B(i,j) = max{ H(i-1,j-1) - r - d(i),   B(i-1,j) }
+				u = _mm_sub_epi32(_mm_load_si128(H1 + j - 1), io);
+				v = _mm_load_si128(B + j);
+				t = _mm_sub_epi32(u, di);
+				t = _mm_max_epi32(t, v);
+				_mm_store_si128(B + j, t);
+				h = _mm_max_epi32(h, _mm_sub_epi32(t, aim2));
+				// C(i,j) = max{ H(i-1,j-1) - r - d(i+1), C(i-1,j) }
+				v = _mm_load_si128(C + j);
+				t = _mm_sub_epi32(u, dip1);
+				t = _mm_max_epi32(t, v);
+				_mm_store_si128(C + j, t);
+				h = _mm_max_epi32(h, _mm_sub_epi32(t, aim1));
+				// H(i-1,j-1)-f and H(i-2,j-1)-f
+				t = _mm_sub_epi32(_mm_load_si128(H1 + j), fs);
+				h = _mm_max_epi32(h, t);
+				t = _mm_sub_epi32(_mm_load_si128(H2 + j), fs);
+				h = _mm_max_epi32(h, t);
+				// H(i-1,j)-f and H(i-2,j)-f
+				t = _mm_sub_epi32(_mm_load_si128(H1 + j - 1), fs);
+				h = _mm_max_epi32(h, t);
+				t = _mm_sub_epi32(_mm_load_si128(H2 + j - 1), fs);
+				h = _mm_max_epi32(h, t);
+				// save H
+				_mm_store_si128(H + j, h);
+				last_h = h;
+			}
+			for (k = 0; k < vsize; ++k) { // lazy-F loop
+				I = _mm_insert_epi32(_mm_slli_si128(I, sizeof(ns_int_t)), neg_inf, 0);
+				for (j = 0; j < slen; ++j) {
+					__m128i h;
+					h = _mm_load_si128(H + j);
+					h = _mm_max_epi32(h, I);
+					_mm_store_si128(H + j, h);
+					h = _mm_sub_epi32(h, goe);
+					I = _mm_sub_epi32(I, ge);
+					if (!_mm_movemask_epi8(_mm_cmpgt_epi32(I, h))) break;
+				}
+				if (k < vsize) break;
+			}
+			tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
+			tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
+		}
+	} else {
+		for (i = 2; i < nl; ++i) {
+			__m128i *tbi = tb + i * slen;
+			NS_GEN_INIT2(epi32)
+			for (j = 0; j < slen; ++j) {
+				__m128i h, t, u, v, y, z;
+				// H(i-3,j-1) + s(i,j)
+				y = _mm_setzero_si128();
+				z = _mm_setzero_si128();
+				u = _mm_load_si128(H3 + j - 1);
+				v = _mm_load_si128(S + j);
+				h = _mm_add_epi32(u, v);
+				// I(i,j) = max{ H(i,j-1) - q, I(i,j-1) } - e
+				t = _mm_sub_epi32(last_h, go);
+				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi32(I, t), _mm_set1_epi32(1<<4)));
+				t = _mm_max_epi32(t, I);
+				I = _mm_sub_epi32(t, ge);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(1), _mm_cmpgt_epi32(I, h));
+				h = _mm_max_epi32(h, I);
+				// D(i,j) = max{ H(i-3,j) - q, D(i-3,j) } - e
+				u = _mm_sub_epi32(_mm_load_si128(H3 + j), go);
+				v = _mm_load_si128(D3 + j);
+				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi32(v, u), _mm_set1_epi32(1<<5)));
+				t = _mm_max_epi32(u, v);
+				t = _mm_sub_epi32(t, ge);
+				_mm_store_si128(D + j, t);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(2), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				// A(i,j) = max{ H(i-1,j)   - r - d(i-1), A(i-1,j) }
+				u = _mm_sub_epi32(_mm_load_si128(H1 + j), io);
+				v = _mm_load_si128(A + j);
+				t = _mm_sub_epi32(u, dim1);
+				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi32(v, t), _mm_set1_epi32(1<<6)));
+				t = _mm_max_epi32(t, v);
+				_mm_store_si128(A + j, t);
+				t = _mm_sub_epi32(t, ai);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(3), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				// B(i,j) = max{ H(i-1,j-1) - r - d(i),   B(i-1,j) }
+				u = _mm_sub_epi32(_mm_load_si128(H1 + j - 1), io);
+				v = _mm_load_si128(B + j);
+				t = _mm_sub_epi32(u, di);
+				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi32(v, t), _mm_set1_epi32(1<<7)));
+				t = _mm_max_epi32(t, v);
+				_mm_store_si128(B + j, t);
+				t = _mm_sub_epi32(t, aim2);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(4), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				// C(i,j) = max{ H(i-1,j-1) - r - d(i+1), C(i-1,j) }
+				v = _mm_load_si128(C + j);
+				t = _mm_sub_epi32(u, dip1);
+				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi32(v, t), _mm_set1_epi32(1<<8)));
+				t = _mm_max_epi32(t, v);
+				_mm_store_si128(C + j, t);
+				t = _mm_sub_epi32(t, aim1);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(5), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				// H(i-1,j-1)-f and H(i-2,j-1)-f
+				t = _mm_sub_epi32(_mm_load_si128(H1 + j), fs);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(6), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				t = _mm_sub_epi32(_mm_load_si128(H2 + j), fs);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(7), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				// H(i-1,j)-f and H(i-2,j)-f
+				t = _mm_sub_epi32(_mm_load_si128(H1 + j - 1), fs);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(8), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				t = _mm_sub_epi32(_mm_load_si128(H2 + j - 1), fs);
+				y = _mm_blendv_epi8(y, _mm_set1_epi32(9), _mm_cmpgt_epi32(t, h));
+				h = _mm_max_epi32(h, t);
+				// save H and traceback
+				z = _mm_or_si128(z, y);
+				_mm_store_si128(tbi + j, z);
+				_mm_store_si128(H + j, h);
+				last_h = h;
+			}
+			for (k = 0; k < vsize; ++k) { // lazy-F loop
+				I = _mm_insert_epi32(_mm_slli_si128(I, sizeof(ns_int_t)), neg_inf, 0);
+				for (j = 0; j < slen; ++j) {
+					__m128i h, z;
+					z = _mm_load_si128(tbi + j);
+					h = _mm_load_si128(H + j);
+					z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi32(I, h), _mm_set1_epi32(1<<9)));
+					h = _mm_max_epi32(h, I);
+					_mm_store_si128(tbi + j, z);
+					_mm_store_si128(H + j, h);
+					h = _mm_sub_epi32(h, goe);
+					I = _mm_sub_epi32(I, ge);
+					if (!_mm_movemask_epi8(_mm_cmpgt_epi32(I, h))) break;
 				}
 				if (k < vsize) break;
 			}
