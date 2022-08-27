@@ -22,13 +22,13 @@ static __m128i *ns_alloc16(void *km, size_t n, uint8_t **mem)
 	return (__m128i*)(((size_t)(*mem) + 15) / 16 * 16);
 }
 
-static void ns_backtrack(void *km, const __m128i *bt, int32_t nl, int32_t al, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
+static void ns_backtrack(void *km, const __m128i *tb, int32_t nl, int32_t al, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
 {
 	int32_t i = nl - 1, j = al - 1, last = 0, slen = (al + 7) / 8;
 	uint32_t *cigar = *cigar_, tmp;
 	while (i >= 1 && j >= 0) {
-		const __m128i *bti = &bt[i * slen];
-		int32_t x = *((int16_t*)&bti[j%slen] + j/slen);
+		const __m128i *tbi = &tb[i * slen];
+		int32_t x = *((int16_t*)&tbi[j%slen] + j/slen);
 		int32_t state, ext;
 		if (x>>9&1) x = 1|x>>4<<4;
 		state = last == 0? x&0xf : last;
@@ -252,18 +252,18 @@ void ns_global_score_gs16(void *km, const char *ns, int32_t nl, const char *as, 
 	kfree(km, nas);
 }
 
-void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
+void ns_global_tb_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
 	NS_GEN_DEF(int16_t)
-	__m128i *bt;
+	__m128i *tb;
 	uint8_t *mem_bt;
 	NS_GEN_VAR(epi16)
 	NS_GEN_PREPARE(epi16)
 	NS_GEN_INIT1(epi16)
-	bt = ns_alloc16(km, nl * slen, &mem_bt);
+	tb = ns_alloc16(km, nl * slen, &mem_bt);
 
 	for (i = 2; i < nl; ++i) {
-		__m128i *bti = bt + i * slen;
+		__m128i *tbi = tb + i * slen;
 		NS_GEN_INIT2(epi16)
 		for (j = 0; j < slen; ++j) {
 			__m128i h, t, u, v, y, z;
@@ -335,7 +335,7 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 			h = _mm_max_epi16(h, t);
 
 			z = _mm_or_si128(z, y);
-			_mm_store_si128(bti + j, z);
+			_mm_store_si128(tbi + j, z);
 			_mm_store_si128(H + j, h);
 			last_h = h;
 		}
@@ -343,11 +343,11 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 			I = _mm_insert_epi16(_mm_slli_si128(I, sizeof(ns_int_t)), neg_inf, 0);
 			for (j = 0; j < slen; ++j) {
 				__m128i h, z;
-				z = _mm_load_si128(bti + j);
+				z = _mm_load_si128(tbi + j);
 				h = _mm_load_si128(H + j);
 				z = _mm_or_si128(z, _mm_and_si128(_mm_cmpgt_epi16(I, h), _mm_set1_epi16(1<<9)));
 				h = _mm_max_epi16(h, I);
-				_mm_store_si128(bti + j, z);
+				_mm_store_si128(tbi + j, z);
 				_mm_store_si128(H + j, h);
 				h = _mm_subs_epi16(h, goe);
 				I = _mm_subs_epi16(I, ge);
@@ -362,6 +362,6 @@ void ns_global_bt_gs16(void *km, const char *ns, int32_t nl, const char *as, int
 	kfree(km, mem_H);
 	kfree(km, mem_ap);
 	kfree(km, nas);
-	ns_backtrack(km, bt, nl, al, &r->cigar, &r->n_cigar, &r->m_cigar);
+	ns_backtrack(km, tb, nl, al, &r->cigar, &r->n_cigar, &r->m_cigar);
 	kfree(km, mem_bt);
 }
