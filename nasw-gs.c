@@ -1,4 +1,5 @@
 #include <string.h>
+#include <assert.h>
 #include <stdio.h>
 #include "nasw.h"
 #include "kalloc.h"
@@ -22,14 +23,16 @@ static __m128i *ns_alloc16(void *km, size_t n, uint8_t **mem)
 	return (__m128i*)(((size_t)(*mem) + 15) / 16 * 16);
 }
 
-static void ns_backtrack(void *km, const __m128i *tb, int32_t nl, int32_t al, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
+static void ns_backtrack(void *km, int32_t vs, const __m128i *tb, int32_t nl, int32_t al, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
 {
-	int32_t i = nl - 1, j = al - 1, last = 0, slen = (al + 7) / 8;
+	int32_t i = nl - 1, j = al - 1, last = 0, slen = (al + vs - 1) / vs;
 	uint32_t *cigar = *cigar_, tmp;
+	assert(vs == 4 || vs == 8);
 	while (i >= 1 && j >= 0) {
 		const __m128i *tbi = &tb[i * slen];
 		int32_t x = *((int16_t*)&tbi[j%slen] + j/slen);
 		int32_t state, ext;
+		if (vs == 4) x = *((int32_t*)&tbi[j%slen] + j/slen);
 		if (x>>9&1) x = 1|x>>4<<4;
 		state = last == 0? x&0xf : last;
 		ext = state >= 1 && state <= 5? x>>(state+3)&1 : 0;
@@ -349,7 +352,7 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 	kfree(km, mem_ap);
 	kfree(km, nas);
 	if (tb) {
-		ns_backtrack(km, tb, nl, al, &r->cigar, &r->n_cigar, &r->m_cigar);
+		ns_backtrack(km, vsize, tb, nl, al, &r->cigar, &r->n_cigar, &r->m_cigar);
 		kfree(km, mem_tb);
 	}
 }
