@@ -4,7 +4,7 @@ CFLAGS=		-g -Wall -msse4.1 -std=c99 -O3
 CXXFLAGS=	$(CFLAGS)
 CPPFLAGS=
 INCLUDES=
-OBJS=		kalloc.o nasw-tab.o nasw-s.o nasw-f.o nasw-gs.o
+OBJS=		kalloc.o nasw-tab.o nasw-s.o nasw-sse.o
 PROG=		nasw
 LIBS=		-lpthread -lz
 
@@ -36,8 +36,7 @@ depend:
 # DO NOT DELETE
 
 kalloc.o: kalloc.h
-main.o: ketopt.h nasw.h kseq.h
-nasw-f.o: nasw.h kalloc.h
-nasw-gs.o: nasw.h kalloc.h
+main.o: ketopt.h nasw.h kalloc.h kseq.h
 nasw-s.o: nasw.h kalloc.h
-nasw-tab.o: nasw.h
+nasw-sse.o: nasw.h kalloc.h
+nasw-tab.o: nasw.h kalloc.h
