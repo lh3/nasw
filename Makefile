@@ -13,6 +13,10 @@ ifneq ($(asan),)
 	LIBS+=-fsanitize=address -ldl -lm
 endif
 
+ifneq ($(sse4),)
+	CFLAGS+=-msse4
+endif
+
 .SUFFIXES:.c .cpp .o
 .PHONY:all clean depend
 
