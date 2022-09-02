@@ -4,8 +4,10 @@
 #include "nasw.h"
 #include "kalloc.h"
 
-#ifdef __SSE4_1__
+#if defined(__SSE4_1__)
 #include <smmintrin.h>
+#elif defined(__ARM_NEON)
+#include "s2n-lite.h"
 #endif
 
 /*
@@ -240,7 +242,11 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 					_mm_store_si128(H + j, h);
 					h = _mm_subs_epi16(h, goe);
 					I = _mm_subs_epi16(I, ge);
+#if defined(__SSE2__)
 					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) break;
+#elif defined(__ARM_NEON)
+					if (vmaxvq_u8(_mm_subs_epi16(I, h)) == 0) break;
+#endif
 				}
 				if (k < vsize) break;
 			}
@@ -336,7 +342,11 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 					_mm_store_si128(H + j, h);
 					h = _mm_subs_epi16(h, goe);
 					I = _mm_subs_epi16(I, ge);
+#if defined(__SSE2__)
 					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) break;
+#elif defined(__ARM_NEON)
+					if (vmaxvq_u8(_mm_subs_epi16(I, h)) == 0) break;
+#endif
 				}
 				if (k < vsize) break;
 			}
@@ -427,7 +437,11 @@ void ns_global_gs32(void *km, const char *ns, int32_t nl, const char *as, int32_
 					_mm_store_si128(H + j, h);
 					h = _mm_sub_epi32(h, goe);
 					I = _mm_sub_epi32(I, ge);
-					if (!_mm_movemask_epi8(_mm_cmpgt_epi32(I, h))) break;
+#if defined(__SSE2__)
+					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) break;
+#elif defined(__ARM_NEON)
+					if (vmaxvq_u8(vreinterpretq_u8_s32(vqsubq_s32(vreinterpretq_s32_u8(I), vreinterpretq_s32_u8(h)))) == 0) break;
+#endif
 				}
 				if (k < vsize) break;
 			}
@@ -523,7 +537,11 @@ void ns_global_gs32(void *km, const char *ns, int32_t nl, const char *as, int32_
 					_mm_store_si128(H + j, h);
 					h = _mm_sub_epi32(h, goe);
 					I = _mm_sub_epi32(I, ge);
-					if (!_mm_movemask_epi8(_mm_cmpgt_epi32(I, h))) break;
+#if defined(__SSE2__)
+					if (!_mm_movemask_epi8(_mm_cmpgt_epi16(I, h))) break;
+#elif defined(__ARM_NEON)
+					if (vmaxvq_u8(vreinterpretq_u8_s32(vqsubq_s32(vreinterpretq_s32_u8(I), vreinterpretq_s32_u8(h)))) == 0) break;
+#endif
 				}
 				if (k < vsize) break;
 			}
