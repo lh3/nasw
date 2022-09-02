@@ -191,10 +191,10 @@ static inline int ns_le_epi32(__m128i a, __m128i b)
 
 static inline __m128i ns_select(__m128i cond, __m128i a, __m128i b)
 {
-#if defined(__SSE2__)
-	return _mm_or_si128(_mm_and_si128(a, cond), _mm_andnot_si128(cond, b));
-#elif defined(__ARM_NEON) || defined(__SSE4_1__)
+#if defined(__ARM_NEON) || defined(__SSE4_1__) // there is an ARM emulation of _mm_blendv_epi8()
 	return _mm_blendv_epi8(b, a, cond);
+#elif defined(__SSE2__)
+	return _mm_or_si128(_mm_and_si128(a, cond), _mm_andnot_si128(cond, b));
 #endif
 }
 
