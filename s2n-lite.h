@@ -13,7 +13,7 @@ static inline __m128i _mm_and_si128(__m128i a, __m128i b) { return vreinterpretq
 
 #define _mm_slli_si128(a, imm8) vextq_u8(_mm_setzero_si128(), (a), 16 - (imm8))
 
-static inline __m128i _mm_blendv_epi8(__m128i a, __m128i b, __m128i mask) { return vbslq_u8(vshrq_n_u8(mask, 7), b, a); }
+static inline __m128i _mm_blendv_epi8(__m128i a, __m128i b, __m128i mask) { return vbslq_u8(vreinterpretq_u8_s8(vshrq_n_s8(vreinterpretq_s8_u8(mask), 7)), b, a); }
 
 static inline __m128i _mm_set1_epi16(int a) { return vreinterpretq_u8_s16(vdupq_n_s16(a)); }
 static inline __m128i _mm_cmpgt_epi16(__m128i a, __m128i b) { return vreinterpretq_u8_u16(vcgtq_s16(vreinterpretq_s16_u8(a), vreinterpretq_s16_u8(b))); }

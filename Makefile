@@ -38,5 +38,5 @@ depend:
 kalloc.o: kalloc.h
 main.o: ketopt.h nasw.h kalloc.h kseq.h
 nasw-s.o: nasw.h kalloc.h
-nasw-sse.o: nasw.h kalloc.h
+nasw-sse.o: nasw.h kalloc.h s2n-lite.h
 nasw-tab.o: nasw.h kalloc.h
