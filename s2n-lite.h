@@ -7,7 +7,7 @@ typedef uint8x16_t __m128i;
 
 static inline __m128i _mm_load_si128(const __m128i *ptr) { return vld1q_u8((const uint8_t*)ptr); }
 static inline void _mm_store_si128(__m128i *ptr, __m128i a) { vst1q_u8((uint8_t*)ptr, a); }
-static inline __m128i _mm_setzero_si128(void) { return vreinterpretq_u8_s32(vdupq_n_s32(0)); }
+static inline __m128i _mm_setzero_si128(void) { return vdupq_n_u8(0); }
 static inline __m128i _mm_or_si128(__m128i a, __m128i b) { return vreinterpretq_u8_s32(vorrq_s32(vreinterpretq_s32_u8(a), vreinterpretq_s32_u8(b))); }
 static inline __m128i _mm_and_si128(__m128i a, __m128i b) { return vreinterpretq_u8_s32(vandq_s32(vreinterpretq_s32_u8(a), vreinterpretq_s32_u8(b))); }
 
