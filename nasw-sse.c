@@ -176,7 +176,7 @@ static inline int ns_le_epi16(__m128i a, __m128i b)
 #if defined(__SSE2__)
 	return !_mm_movemask_epi8(_mm_cmpgt_epi16(a, b));
 #elif defined(__ARM_NEON)
-	return (vmaxvq_u8(_mm_subs_epi16(a, b)) == 0);
+	return (vmaxvq_u8(_mm_cmpgt_epi16(a, b)) == 0);
 #endif
 }
 
@@ -185,7 +185,7 @@ static inline int ns_le_epi32(__m128i a, __m128i b)
 #if defined(__SSE2__)
 	return !_mm_movemask_epi8(_mm_cmpgt_epi16(a, b));
 #elif defined(__ARM_NEON)
-	return (vmaxvq_u8(vreinterpretq_u8_s32(vqsubq_s32(vreinterpretq_s32_u8(a), vreinterpretq_s32_u8(b)))) == 0);
+	return (vmaxvq_u8(_mm_cmpgt_epi32(a, b)) == 0);
 #endif
 }
 
@@ -280,6 +280,7 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 				_mm_store_si128(H + j, h);
 				last_h = h;
 			}
+			I = _mm_max_epi16(_mm_subs_epi16(last_h, goe), _mm_subs_epi16(I, ge));
 			for (k = 0; k < vsize; ++k) { // lazy-F loop
 				I = _mm_insert_epi16(_mm_slli_si128(I, sizeof(ns_int_t)), neg_inf, 0);
 				for (j = 0; j < slen; ++j) {
@@ -373,7 +374,7 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 				_mm_store_si128(H + j, h);
 				last_h = h;
 			}
-			printf("{%d}\t", i); int32_t x; for (x = 0; x < al; ++x) printf("%d\t", *((ns_int_t*)&I + x)); putchar('\n');
+			I = _mm_max_epi16(_mm_subs_epi16(last_h, goe), _mm_subs_epi16(I, ge));
 			for (k = 0; k < vsize; ++k) { // lazy-F loop
 				I = _mm_insert_epi16(_mm_slli_si128(I, sizeof(ns_int_t)), neg_inf, 0);
 				for (j = 0; j < slen; ++j) {
@@ -386,12 +387,11 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 					_mm_store_si128(H + j, h);
 					h = _mm_subs_epi16(h, goe);
 					I = _mm_subs_epi16(I, ge);
-					//printf("(%d,%d)\t", i, k); int32_t x; for (x = 0; x < al; ++x) printf("%d,%d\t", *((ns_int_t*)&I + x), *((ns_int_t*)&h + x)); putchar('\n');
 					if (ns_le_epi16(I, h)) break;
 				}
 				if (j < slen) break;
 			}
-			printf("[%d]\t", i); for (j = 0; j < al; ++j) printf("%d\t", *((ns_int_t*)&H[0] + j)); putchar('\n');
+			//printf("[%d:%d]\t", i, k); for (j = 0; j < al; ++j) printf("%d\t", *((ns_int_t*)&H[0] + j)); putchar('\n');
 			tmp = H3, H3 = H2, H2 = H1, H1 = H, H = tmp;
 			tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 		}
@@ -470,6 +470,7 @@ void ns_global_gs32(void *km, const char *ns, int32_t nl, const char *as, int32_
 				_mm_store_si128(H + j, h);
 				last_h = h;
 			}
+			I = _mm_max_epi32(_mm_sub_epi32(last_h, goe), _mm_sub_epi32(I, ge));
 			for (k = 0; k < vsize; ++k) { // lazy-F loop
 				I = _mm_insert_epi32(_mm_slli_si128(I, sizeof(ns_int_t)), neg_inf, 0);
 				for (j = 0; j < slen; ++j) {
@@ -563,6 +564,7 @@ void ns_global_gs32(void *km, const char *ns, int32_t nl, const char *as, int32_
 				_mm_store_si128(H + j, h);
 				last_h = h;
 			}
+			I = _mm_max_epi32(_mm_sub_epi32(last_h, goe), _mm_sub_epi32(I, ge));
 			for (k = 0; k < vsize; ++k) { // lazy-F loop
 				I = _mm_insert_epi32(_mm_slli_si128(I, sizeof(ns_int_t)), neg_inf, 0);
 				for (j = 0; j < slen; ++j) {
