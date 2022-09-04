@@ -190,14 +190,14 @@ static uint8_t *ns_prep_seq_left(void *km, const char *ns, int32_t nl, const cha
 	fs = sse_gen(set1, _suf)(opt->fs); \
 	H0 = ns_alloc16(km, (slen + 1) * 5 + slen * 7, &mem_H); \
 	H = H0 + 1, H1 = H0 + (slen + 1) + 1, H2 = H0 + (slen + 1) * 2 + 1, H3 = H0 + (slen + 1) * 3 + 1; \
-	Hmax = H3 + (slen + 1) * 4 + 1; \
+	Hmax = H0 + (slen + 1) * 4 + 1; \
 	D = Hmax + slen, D1 = D + slen, D2 = D1 + slen, D3 = D2 + slen; \
 	A = D3 + slen, B = A + slen, C = B + slen; \
 	if ((opt->flag & NS_F_CIGAR) && !is_ext) \
 		tb = ns_alloc16(km, nl * slen, &mem_tb);
 
 #define NS_GEN_INIT1(_suf) \
-	for (i = 0; i < (slen + 1) * 4 + slen * 7; ++i) \
+	for (i = 0; i < (slen + 1) * 5 + slen * 7; ++i) \
 		H0[i] = sse_gen(set1, _suf)(neg_inf); \
 	H3[-1] = sse_gen(insert, _suf)(H3[-1], 0, 0); \
 	H2[-1] = sse_gen(insert, _suf)(H2[-1], -opt->fs, 0); \
