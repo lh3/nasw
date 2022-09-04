@@ -37,7 +37,7 @@ typedef struct {
 
 typedef struct {
 	int32_t n_cigar, m_cigar;
-	int32_t nt_st, nt_en, aa_st, aa_en;
+	int32_t nt_len, aa_len;
 	int32_t score;
 	uint32_t *cigar;
 } ns_rst_t;

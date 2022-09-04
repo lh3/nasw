@@ -52,8 +52,7 @@ int main(int argc, char *argv[])
 		if (no_sse) ns_splice_s1(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else if (use_32) ns_global_gs32(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else ns_global_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
-		printf("%s\t%ld\t%d\t%d\t%s\t%ld\t%d\t%d\t%d\t", ksn->name.s, ksn->seq.l, r.nt_st, r.nt_en + 1,
-			   ksa->name.s, ksa->seq.l, r.aa_st, r.aa_en + 1, r.score);
+		printf("%s\t%ld\t%d\t%s\t%ld\t%d\t%d\t", ksn->name.s, ksn->seq.l, r.nt_len, ksa->name.s, ksa->seq.l, r.aa_len, r.score);
 		for (i = 0; i < r.n_cigar; ++i)
 			printf("%d%c", r.cigar[i]>>4, NS_CIGAR_STR[r.cigar[i]&0xf]);
 		putchar('\n');

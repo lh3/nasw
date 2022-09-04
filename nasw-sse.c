@@ -121,6 +121,40 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 	return nas;
 }
 
+static uint8_t *ns_prep_seq_left(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, uint8_t **aas_, int8_t **donor_, int8_t **acceptor_)
+{
+	int32_t i, j;
+	uint8_t *nas, *aas, tmp;
+	int8_t *donor, *acceptor;
+	nas = Kmalloc(km, uint8_t, nl + al + (nl + 1) * 2);
+	*aas_ = aas = nas + nl;
+	*donor_ = donor = (int8_t*)aas + al, *acceptor_ = acceptor = donor + nl + 1;
+	for (j = 0; j < al; ++j) // generate aas[]
+		aas[al - 1 - j] = opt->aa20[(uint8_t)as[j]];
+	for (i = 0; i < nl; ++i) // nt4 encoding of ns[] for computing donor[] and acceptor[]
+		nas[nl - 1 - i] = opt->nt4[(uint8_t)ns[i]];
+	for (i = 0; i < nl + 1; ++i)
+		donor[i] = acceptor[i] = opt->nc;
+	for (i = 0; i < nl - 3; ++i) { // generate donor[]
+		int32_t t = 0;
+		if (nas[i+1] == 2 && nas[i+2] == 1) t = 1; // GA-- (because nas has been reversed)
+		if (t && i + 3 < nl && (nas[i+3] == 1 || nas[i+3] == 3)) t = 2;
+		donor[i] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
+	}
+	for (i = 1; i < nl; ++i) { // generate acceptor[]
+		int32_t t = 0;
+		if (nas[i-1] == 3 && nas[i] == 2) t = 1; // --TG
+		if (t && i >= 2 && (nas[i-2] == 0 || nas[i-2] == 2)) t = 2;
+		acceptor[i] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
+	}
+	ns_prep_nas(ns, nl, opt, nas);
+	for (i = 0; i < nl>>1; ++i) // reverse
+		tmp = nas[i], nas[i] = nas[nl - 1 - i], nas[nl - 1 - i] = tmp;
+	memmove(nas + 2, nas, nl - 2);
+	nas[0] = nas[1] = opt->aa20['X'];
+	return nas;
+}
+
 #define ns_gen_prof(INT_TYPE, _km, aas, al, opt, neg_inf, _mem_ap, _ap) do { \
 	INT_TYPE *t; \
 	int32_t a, p = 16 / sizeof(INT_TYPE), slen = (al + p - 1) / p; \
@@ -145,8 +179,9 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 	__m128i go, ge, goe, io, fs; \
 
 #define NS_GEN_PREPARE(_suf) \
-	r->n_cigar = 0, r->nt_en = nl - 1, r->aa_en = al - 1, r->nt_st = r->aa_st = 0, r->score = INT32_MIN; \
-	nas = ns_prep_seq(km, ns, nl, as, al, opt, &aas, &donor, &acceptor); \
+	r->n_cigar = 0, r->nt_len = nl, r->aa_len = al, r->score = INT32_MIN; \
+	if (opt->flag & NS_F_EXT_LEFT) nas = ns_prep_seq_left(km, ns, nl, as, al, opt, &aas, &donor, &acceptor); \
+	else nas = ns_prep_seq(km, ns, nl, as, al, opt, &aas, &donor, &acceptor); \
 	ns_gen_prof(ns_int_t, km, aas, al, opt, neg_inf, &mem_ap, &ap); \
 	go = sse_gen(set1, _suf)(opt->go); \
 	ge = sse_gen(set1, _suf)(opt->ge); \
@@ -335,7 +370,7 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 				if (sc == max_sc) break;
 			}
 			assert(j < al);
-			r->nt_en = max_i, r->aa_en = j, r->score = max_sc;
+			r->nt_len = max_i + 1, r->aa_len = j + 1, r->score = max_sc;
 		}
 	} else {
 		for (i = 2; i < nl; ++i) {
