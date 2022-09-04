@@ -471,8 +471,7 @@ void ns_global_gs16(void *km, const char *ns, int32_t nl, const char *as, int32_
 			tmp = D3, D3 = D2, D2 = D1, D1 = D, D = tmp;
 		}
 	}
-	if (r->score == INT32_MIN)
-		r->score = *((ns_int_t*)&H1[(al-1)%slen] + (al-1)/slen);
+	if (!is_ext) r->score = *((ns_int_t*)&H1[(al-1)%slen] + (al-1)/slen);
 	kfree(km, mem_H);
 	kfree(km, mem_ap);
 	kfree(km, nas);
