@@ -6,11 +6,6 @@
 #define NS_NEG_INF (-0x40000000)
 #define ns_max(x, y) ((x) >= (y)? (x) : (y))
 
-void ns_rst_init(ns_rst_t *r)
-{
-	memset(r, 0, sizeof(*r));
-}
-
 static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aal, uint32_t **cigar_, int32_t *n_cigar, int32_t *m_cigar)
 {
 	int32_t i = nal - 1, j = aal - 1, last = 0;
