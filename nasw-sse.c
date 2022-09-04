@@ -76,10 +76,25 @@ static void ns_backtrack(void *km, int32_t vs, const __m128i *tb, int32_t nl, in
 	*cigar_ = cigar;
 }
 
+static void ns_prep_nas(const char *ns, int32_t nl, const ns_opt_t *opt, uint8_t *nas)
+{
+	int32_t i, l;
+	uint8_t codon;
+	memset(nas, opt->aa20['X'], nl);
+	for (i = l = 0, codon = 0; i < nl; ++i) { // generate the real nas[]
+		uint8_t c = opt->nt4[(uint8_t)ns[i]];
+		if (c < 4) {
+			codon = (codon << 2 | c) & 0x3f;
+			if (++l >= 3)
+				nas[i] = opt->codon[codon];
+		} else codon = 0, l = 0;
+	}
+}
+
 static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, uint8_t **aas_, int8_t **donor_, int8_t **acceptor_)
 {
-	int32_t i, j, l;
-	uint8_t codon, *nas, *aas;
+	int32_t i, j;
+	uint8_t *nas, *aas;
 	int8_t *donor, *acceptor;
 	nas = Kmalloc(km, uint8_t, nl + al + (nl + 1) * 2);
 	*aas_ = aas = nas + nl;
@@ -102,15 +117,7 @@ static uint8_t *ns_prep_seq(void *km, const char *ns, int32_t nl, const char *as
 		if (t && i >= 2 && (nas[i-2] == 1 || nas[i-2] == 3)) t = 2;
 		acceptor[i] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
 	}
-	memset(nas, opt->aa20['X'], nl);
-	for (i = l = 0, codon = 0; i < nl; ++i) { // generate the real nas[]
-		uint8_t c = opt->nt4[(uint8_t)ns[i]];
-		if (c < 4) {
-			codon = (codon << 2 | c) & 0x3f;
-			if (++l >= 3)
-				nas[i] = opt->codon[codon];
-		} else codon = 0, l = 0;
-	}
+	ns_prep_nas(ns, nl, opt, nas);
 	return nas;
 }
 

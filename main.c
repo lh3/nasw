@@ -18,11 +18,12 @@ int main(int argc, char *argv[])
 	ns_make_tables(0);
 	ns_opt_init(&opt);
 	opt.flag |= NS_F_CIGAR;
-	while ((c = ketopt(&o, argc, argv, 1, "pswlr", 0)) >= 0) {
+	while ((c = ketopt(&o, argc, argv, 1, "pswlrx:", 0)) >= 0) {
 		if (c == 'p') no_sse = 1;
 		else if (c == 's') opt.flag &= ~NS_F_CIGAR;
 		else if (c == 'l') opt.flag |= NS_F_EXT_LEFT;
 		else if (c == 'r') opt.flag |= NS_F_EXT_RIGHT;
+		else if (c == 'x') opt.xdrop = atoi(o.arg);
 		else if (c == 'w') use_32 = 1;
 	}
 	if (argc - o.ind < 2) {
@@ -32,6 +33,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "  -s       compute score only without nasw-CIGAR\n");
 		fprintf(stderr, "  -l       left extension\n");
 		fprintf(stderr, "  -r       right extension\n");
+		fprintf(stderr, "  -x INT   x-drop [%d]\n", opt.xdrop);
 		fprintf(stderr, "  -p       non-SSE mode\n");
 		return 1;
 	}
