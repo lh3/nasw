@@ -18,9 +18,11 @@ int main(int argc, char *argv[])
 	ns_make_tables(0);
 	ns_opt_init(&opt);
 	opt.flag |= NS_F_CIGAR;
-	while ((c = ketopt(&o, argc, argv, 1, "lsw", 0)) >= 0) {
-		if (c == 'l') no_sse = 1;
+	while ((c = ketopt(&o, argc, argv, 1, "pswlr", 0)) >= 0) {
+		if (c == 'p') no_sse = 1;
 		else if (c == 's') opt.flag &= ~NS_F_CIGAR;
+		else if (c == 'l') opt.flag |= NS_F_EXT_LEFT;
+		else if (c == 'r') opt.flag |= NS_F_EXT_RIGHT;
 		else if (c == 'w') use_32 = 1;
 	}
 	if (argc - o.ind < 2) {
@@ -28,7 +30,9 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Options:\n");
 		fprintf(stderr, "  -w       use 32-bit integers for scoring (16-bit by default)\n");
 		fprintf(stderr, "  -s       compute score only without nasw-CIGAR\n");
-		fprintf(stderr, "  -l       non-SSE mode\n");
+		fprintf(stderr, "  -l       left extension\n");
+		fprintf(stderr, "  -r       right extension\n");
+		fprintf(stderr, "  -p       non-SSE mode\n");
 		return 1;
 	}
 
@@ -46,7 +50,8 @@ int main(int argc, char *argv[])
 		if (no_sse) ns_splice_s1(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else if (use_32) ns_global_gs32(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else ns_global_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
-		printf("%s\t%ld\t%s\t%ld\t%d\t", ksn->name.s, ksn->seq.l, ksa->name.s, ksa->seq.l, r.score);
+		printf("%s\t%ld\t%d\t%d\t%s\t%ld\t%d\t%d\t%d\t", ksn->name.s, ksn->seq.l, r.nt_st, r.nt_en + 1,
+			   ksa->name.s, ksa->seq.l, r.aa_st, r.aa_en + 1, r.score);
 		for (i = 0; i < r.n_cigar; ++i)
 			printf("%d%c", r.cigar[i]>>4, NS_CIGAR_STR[r.cigar[i]&0xf]);
 		putchar('\n');
