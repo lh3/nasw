@@ -137,7 +137,7 @@ static uint8_t *ns_prep_seq_left(void *km, const char *ns, int32_t nl, const cha
 		donor[i] = acceptor[i] = opt->nc;
 	for (i = 0; i < nl - 3; ++i) { // generate donor[]
 		int32_t t = 0;
-		if (nas[i+1] == 2 && nas[i+2] == 1) t = 1; // GA-- (because nas has been reversed)
+		if (nas[i+1] == 2 && nas[i+2] == 0) t = 1; // GA-- (because nas has been reversed)
 		if (t && i + 3 < nl && (nas[i+3] == 1 || nas[i+3] == 3)) t = 2;
 		donor[i] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
 	}
