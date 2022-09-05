@@ -52,7 +52,11 @@ int main(int argc, char *argv[])
 		if (no_sse) ns_splice_s1(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else if (use_32) ns_global_gs32(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
 		else ns_global_gs16(0, ksn->seq.s, ksn->seq.l, ksa->seq.s, ksa->seq.l, &opt, &r);
-		printf("%s\t%ld\t%d\t%s\t%ld\t%d\t%d\t", ksn->name.s, ksn->seq.l, r.nt_len, ksa->name.s, ksa->seq.l, r.aa_len, r.score);
+		if (opt.flag & NS_F_EXT_LEFT) {
+			printf("%s\t%ld\t%ld\t%ld\t+\t%s\t%ld\t%ld\t%ld\t%d\t", ksn->name.s, ksn->seq.l, ksn->seq.l - r.nt_len, ksn->seq.l, ksa->name.s, ksa->seq.l, ksa->seq.l - r.aa_len, ksa->seq.l, r.score);
+		} else {
+			printf("%s\t%ld\t0\t%d\t+\t%s\t%ld\t0\t%d\t%d\t", ksn->name.s, ksn->seq.l, r.nt_len, ksa->name.s, ksa->seq.l, r.aa_len, r.score);
+		}
 		for (i = 0; i < r.n_cigar; ++i)
 			printf("%d%c", r.cigar[i]>>4, NS_CIGAR_STR[r.cigar[i]&0xf]);
 		putchar('\n');
