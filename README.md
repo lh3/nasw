@@ -17,8 +17,7 @@ the DP recursion with SSE2 or NEON intrinsics and is tens of times faster.
 ## Limitations
 
 1. The initial condition disallows gap opens at the beginning of the sequences.
-2. Global alignment only
-3. Simplistic splice site model
-4. The 32-bit mode uses excessive memory for traceback
+2. Simplistic splice site model
+3. The 32-bit mode uses excessive memory for traceback
 
 [genewise]: https://pubmed.ncbi.nlm.nih.gov/15123596/
