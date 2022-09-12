@@ -8,7 +8,7 @@ cd nasw && make
 
 ## Introduction
 
-nasw provides a **proof-of-concept** implementation of dynamic programming (DP)
+nasw provides a implementation of dynamic programming (DP)
 for protein-to-genome alignment with affine-gap penalty, splicing and
 frameshifts. The DP involves 6 states and 20 transitions, similar to the
 [GeneWise][genewise] model. Different from GeneWise, nasw explicitly implements
