@@ -13,6 +13,7 @@ for protein-to-genome alignment with affine-gap penalty, splicing and
 frameshifts. The DP involves 6 states and 20 transitions, similar to the
 [GeneWise][genewise] model. Different from GeneWise, nasw explicitly implements
 the DP recursion with SSE2 or NEON intrinsics and is tens of times faster.
+Please see [nasw.h](nasw.h) for the brief API documentation.
 
 ## Limitations
 
