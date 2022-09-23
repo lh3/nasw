@@ -67,8 +67,8 @@ void ns_opt_init(ns_opt_t *opt)
 	memset(opt, 0, sizeof(*opt));
 	opt->go = 11, opt->ge = 1;
 	opt->io = 31;
-	opt->nc = 5;
-	opt->fs = 15;
+	opt->nc = 11;
+	opt->fs = 17;
 	opt->xdrop = 100;
 	opt->end_bonus = 10;
 	opt->asize = 22;
@@ -76,4 +76,13 @@ void ns_opt_init(ns_opt_t *opt)
 	opt->nt4 = ns_tab_nt4;
 	opt->aa20 = ns_tab_aa20;
 	opt->codon = ns_tab_codon;
+}
+
+void ns_set_stop_sc(int32_t asize, int8_t *mat, int8_t pen)
+{
+	int32_t aa_stop = ns_tab_aa20['*'];
+	int32_t i, score_ori = mat[aa_stop * asize + aa_stop];
+	for (i = 0; i < asize; ++i)
+		mat[aa_stop * asize + i] = mat[i * asize + aa_stop] = -pen;
+	mat[aa_stop * asize + aa_stop] = score_ori;
 }
