@@ -87,7 +87,6 @@ void ns_opt_init(ns_opt_t *opt)
 	opt->go = 11, opt->ge = 1;
 	opt->io = 29;
 	opt->fs = 17;
-	opt->nc = 17; // for compatibility with nasw-s.c
 	opt->xdrop = 100;
 	opt->end_bonus = 5;
 	ns_opt_set_sp(opt, NS_S_HUMAN);

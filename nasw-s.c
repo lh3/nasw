@@ -48,7 +48,7 @@ static void ns_s1_backtrack(void *km, const uint8_t *bk, int32_t nal, int32_t aa
 
 void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t al, const ns_opt_t *opt, ns_rst_t *r)
 {
-	int32_t nal, aal, i, j, *mem_H, *G, *H, *I, *D;
+	int32_t nal, aal, i, j, *mem_H, *G, *H, *I, *D, nc = opt->sp[1];
 	uint8_t *nas, *aas, *bk = 0;
 	int8_t *nap, *acceptor, *donor;
 
@@ -67,18 +67,18 @@ void ns_splice_s1(void *km, const char *ns, int32_t nl, const char *as, int32_t 
 		for (i = 0; i < nl; ++i) // nt4 encoding of ns[] for computing donor[] and acceptor[]
 			nas[i] = opt->nt4[(uint8_t)ns[i]];
 		for (i = 0; i < nal + 1; ++i)
-			donor[i] = acceptor[i] = opt->nc;
+			donor[i] = acceptor[i] = nc;
 		for (i = 0; i < nl - 3; ++i) { // generate donor[]
 			int32_t t = 0;
 			if (nas[i+1] == 2 && nas[i+2] == 3) t = 1;
 			if (t && i + 3 < nl && (nas[i+3] == 0 || nas[i+3] == 2)) t = 2;
-			donor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
+			donor[i+1] = t == 2? 0 : t == 1? nc/2 : nc;
 		}
 		for (i = 1; i < nl; ++i) { // generate acceptor[]
 			int32_t t = 0;
 			if (nas[i-1] == 0 && nas[i] == 2) t = 1;
 			if (t && i > 0 && (nas[i-2] == 1 || nas[i-2] == 3)) t = 2;
-			acceptor[i+1] = t == 2? 0 : t == 1? opt->nc/2 : opt->nc;
+			acceptor[i+1] = t == 2? 0 : t == 1? nc/2 : nc;
 		}
 		memset(nas, opt->aa20['X'], nal);
 		for (i = l = 0, codon = 0; i < nl; ++i) { // generate the real nas[]

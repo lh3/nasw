@@ -57,7 +57,7 @@ extern int8_t ns_mat_blosum62[484];
 
 typedef struct {
 	int32_t flag;
-	int32_t go, ge, io, fs, nc; // gap open, extension, intron open, frameshift
+	int32_t go, ge, io, fs; // gap open, extension, intron open, frameshift
 	int32_t xdrop, end_bonus; // xdrop for extension, and bonus for reaching end of proteins
 	int32_t asize; // alphabet size; always 22 in the current implementation
 	int32_t sp[4];
